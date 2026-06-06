@@ -9,6 +9,8 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             commands::check_brew,
+            commands::detect_brew,
+            commands::get_brew_version,
             commands::get_installed_formulae,
             commands::get_installed_formula_names,
             commands::get_installed_versions,

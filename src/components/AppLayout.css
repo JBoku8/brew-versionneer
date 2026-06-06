@@ -27,6 +27,10 @@
   font-weight: 400;
 }
 
+.brew-checking {
+  font-style: italic;
+}
+
 .brew-missing-badge {
   font-size: 0.8rem;
   padding: 0.25rem 0.5rem;

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   BrewStatus,
   OutdatedResult,
@@ -13,7 +13,8 @@ import { PackageList } from "./PackageList";
 import "./AppLayout.css";
 
 interface AppLayoutProps {
-  brewStatus: BrewStatus;
+  brewStatus: BrewStatus | null;
+  brewChecking: boolean;
 }
 
 const TABS: { id: TabId; label: string; description?: string; requiresBrew?: boolean }[] = [
@@ -32,34 +33,45 @@ const TABS: { id: TabId; label: string; description?: string; requiresBrew?: boo
 
 const EMPTY_OUTDATED: OutdatedResult = { formulae: [], casks: [] };
 
-export function AppLayout({ brewStatus }: AppLayoutProps) {
-  const [activeTab, setActiveTab] = useState<TabId>(
-    brewStatus.installed ? "installed" : "formulae",
-  );
+export function AppLayout({ brewStatus, brewChecking }: AppLayoutProps) {
+  const brewInstalled = brewStatus?.installed ?? false;
+  const brewPending = brewChecking && brewStatus === null;
+
+  const [activeTab, setActiveTab] = useState<TabId>("formulae");
   const [installedVersions, setInstalledVersions] = useState<Record<string, string>>({});
   const [outdatedResult, setOutdatedResult] = useState<OutdatedResult>(EMPTY_OUTDATED);
-  const [installedReady, setInstalledReady] = useState(!brewStatus.installed);
+  const [installedReady, setInstalledReady] = useState(false);
+  const loadGeneration = useRef(0);
+
+  // Switch to Installed tab once brew is confirmed installed (only from initial formulae default).
+  useEffect(() => {
+    if (brewInstalled && !brewPending) {
+      setActiveTab((tab) => (tab === "formulae" ? "installed" : tab));
+    }
+  }, [brewInstalled, brewPending]);
 
   const loadInstalledData = useCallback(() => {
-    if (!brewStatus.installed) {
+    const generation = ++loadGeneration.current;
+
+    if (!brewInstalled) {
+      setInstalledVersions({});
+      setOutdatedResult(EMPTY_OUTDATED);
       setInstalledReady(true);
       return;
     }
+
     setInstalledReady(false);
 
-    async function load() {
-      const [versionsResult, outdatedResult] = await Promise.allSettled([
-        getInstalledVersions(),
-        getOutdatedFormulae(),
-      ]);
-
-      if (versionsResult.status === "fulfilled") {
-        setInstalledVersions(versionsResult.value);
-      } else {
-        // Fast command unavailable (app not rebuilt yet, or brew error) —
-        // fall back to the full brew info command which was working in the MVP.
+    async function loadVersions() {
+      try {
+        const versions = await getInstalledVersions();
+        if (generation !== loadGeneration.current) return;
+        setInstalledVersions(versions);
+      } catch {
+        if (generation !== loadGeneration.current) return;
         try {
           const pkgs = await getInstalledFormulae();
+          if (generation !== loadGeneration.current) return;
           const map: Record<string, string> = {};
           for (const pkg of pkgs) {
             const n = packageName(pkg);
@@ -70,31 +82,54 @@ export function AppLayout({ brewStatus }: AppLayoutProps) {
         } catch {
           // Both paths failed; installed list will be empty but UI stays unblocked.
         }
+      } finally {
+        if (generation === loadGeneration.current) {
+          setInstalledReady(true);
+        }
       }
-
-      if (outdatedResult.status === "fulfilled") {
-        setOutdatedResult(outdatedResult.value);
-      }
-      // If getOutdatedFormulae failed, outdatedResult stays as EMPTY_OUTDATED — acceptable.
     }
 
-    void load().finally(() => setInstalledReady(true));
-  }, [brewStatus.installed]);
+    async function loadOutdated() {
+      try {
+        const outdated = await getOutdatedFormulae();
+        if (generation !== loadGeneration.current) return;
+        setOutdatedResult(outdated);
+      } catch {
+        // Outdated badges stay empty — list is already visible.
+      }
+    }
+
+    void loadVersions();
+    void loadOutdated();
+  }, [brewInstalled]);
 
   useEffect(() => {
+    if (brewPending) {
+      setInstalledReady(false);
+      return;
+    }
+    if (brewChecking) {
+      return;
+    }
     loadInstalledData();
-  }, [loadInstalledData]);
+  }, [brewPending, brewChecking, loadInstalledData]);
+
+  const installedTabDisabled =
+    brewPending || (brewStatus !== null && !brewStatus.installed);
 
   return (
     <div className="app-layout">
       <header className="app-header">
         <div className="app-title">
           <h1>Brew Versionneer</h1>
-          {brewStatus.installed && brewStatus.version && (
+          {brewPending && (
+            <span className="brew-version brew-checking">Checking Homebrew…</span>
+          )}
+          {!brewPending && brewInstalled && brewStatus?.version && (
             <span className="brew-version">{brewStatus.version.split("\n")[0]}</span>
           )}
         </div>
-        {!brewStatus.installed && (
+        {!brewPending && brewStatus !== null && !brewStatus.installed && (
           <span className="brew-missing-badge">Homebrew not detected</span>
         )}
       </header>
@@ -106,11 +141,13 @@ export function AppLayout({ brewStatus }: AppLayoutProps) {
             type="button"
             className={activeTab === tab.id ? "tab active" : "tab"}
             onClick={() => setActiveTab(tab.id)}
-            disabled={tab.requiresBrew && !brewStatus.installed}
+            disabled={tab.requiresBrew && installedTabDisabled}
             title={
-              tab.requiresBrew && !brewStatus.installed
-                ? "Install Homebrew to use this tab"
-                : undefined
+              tab.requiresBrew && brewPending
+                ? "Checking for Homebrew…"
+                : tab.requiresBrew && !brewInstalled
+                  ? "Install Homebrew to use this tab"
+                  : undefined
             }
           >
             {tab.label}
@@ -127,7 +164,7 @@ export function AppLayout({ brewStatus }: AppLayoutProps) {
       <main className="app-main">
         <PackageList
           activeTab={activeTab}
-          brewInstalled={brewStatus.installed}
+          brewInstalled={brewInstalled}
           installedVersions={installedVersions}
           outdatedResult={outdatedResult}
           installedReady={installedReady}

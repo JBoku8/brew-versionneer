@@ -5,10 +5,42 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Brew Versionneer</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background-color: #f6f6f6;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        html,
+        body {
+          background-color: #1e1e1e;
+        }
+      }
+    </style>
+    <link rel="stylesheet" href="/src/components/SplashScreen.css" />
   </head>
 
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="splash-screen">
+        <div class="splash-content">
+          <div class="splash-spinner" aria-hidden="true"></div>
+          <h1 class="splash-title">Brew Versionneer</h1>
+          <p class="splash-tagline">Homebrew package browser</p>
+          <p class="splash-message">Loading…</p>
+        </div>
+      </div>
+    </div>
+    <script type="module">
+      if ("__TAURI_INTERNALS__" in window) {
+        const { getCurrentWindow } = await import("@tauri-apps/api/window");
+        await getCurrentWindow().show();
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

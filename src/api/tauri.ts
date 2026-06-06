@@ -26,6 +26,15 @@ export function checkBrew(): Promise<BrewStatus> {
   return invoke<BrewStatus>("check_brew");
 }
 
+/** Fast path: filesystem lookup only (~1ms), no `brew --version`. */
+export function detectBrew(): Promise<BrewStatus> {
+  return invoke<BrewStatus>("detect_brew");
+}
+
+export function getBrewVersion(): Promise<string | null> {
+  return invoke<string | null>("get_brew_version");
+}
+
 export function getInstalledFormulae(): Promise<PackageRecord[]> {
   return invoke<unknown>("get_installed_formulae").then(normalizePackageList);
 }

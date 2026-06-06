@@ -9,6 +9,17 @@ pub fn check_brew() -> BrewStatus {
     brew::check_brew()
 }
 
+/// Fast path: filesystem lookup only (~1ms), no `brew --version`.
+#[tauri::command]
+pub fn detect_brew() -> BrewStatus {
+    brew::detect_brew()
+}
+
+#[tauri::command]
+pub fn get_brew_version() -> Option<String> {
+    brew::brew_version()
+}
+
 #[tauri::command]
 pub fn get_installed_formulae() -> Result<Value, String> {
     brew::get_installed_formulae_json()

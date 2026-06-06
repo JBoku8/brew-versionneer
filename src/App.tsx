@@ -1,35 +1,26 @@
 import { useBrew } from "./hooks/useBrew";
 import { AppLayout } from "./components/AppLayout";
 import { InstallBrew } from "./components/InstallBrew";
-import { SplashScreen } from "./components/SplashScreen";
 import "./App.css";
 
 function App() {
-  const { status, loading, refresh } = useBrew();
+  const { status, checking, refresh } = useBrew();
 
-  if (loading && !status) {
-    return <SplashScreen message="Checking for Homebrew…" />;
-  }
+  const showInstallBrew = status !== null && !status.installed;
 
-  const brewStatus = status ?? {
-    installed: false,
-    path: null,
-    version: null,
-  };
-
-  if (!brewStatus.installed) {
+  if (showInstallBrew) {
     return (
       <div className="app-shell">
-        <InstallBrew onRecheck={refresh} checking={loading} />
+        <InstallBrew onRecheck={refresh} checking={checking} />
         <div className="browse-without-brew">
           <p className="section-label">Browse without Homebrew</p>
-          <AppLayout brewStatus={brewStatus} />
+          <AppLayout brewStatus={status} brewChecking={checking} />
         </div>
       </div>
     );
   }
 
-  return <AppLayout brewStatus={brewStatus} />;
+  return <AppLayout brewStatus={status} brewChecking={checking} />;
 }
 
 export default App;

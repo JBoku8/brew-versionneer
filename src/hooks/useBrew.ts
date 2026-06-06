@@ -1,22 +1,35 @@
 import { useCallback, useEffect, useState } from "react";
-import { BrewStatus, checkBrew } from "../api/tauri";
+import { BrewStatus, detectBrew, getBrewVersion } from "../api/tauri";
 
 export function useBrew() {
   const [status, setStatus] = useState<BrewStatus | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [checking, setChecking] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    setChecking(true);
     setError(null);
     try {
-      const result = await checkBrew();
-      setStatus(result);
+      const detected = await detectBrew();
+      setStatus(detected);
+
+      if (detected.installed) {
+        try {
+          const version = await getBrewVersion();
+          if (version) {
+            setStatus((prev) =>
+              prev ? { ...prev, version } : { ...detected, version },
+            );
+          }
+        } catch {
+          // Version is optional; shell is already usable.
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setStatus({ installed: false, path: null, version: null });
     } finally {
-      setLoading(false);
+      setChecking(false);
     }
   }, []);
 
@@ -24,5 +37,5 @@ export function useBrew() {
     void refresh();
   }, [refresh]);
 
-  return { status, loading, error, refresh };
+  return { status, checking, error, refresh };
 }

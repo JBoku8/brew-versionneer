@@ -75,7 +75,8 @@ fn brew_output_success(output: std::process::Output) -> Result<String, String> {
     }
 }
 
-pub fn check_brew() -> BrewStatus {
+/// Fast path: filesystem lookup only, no subprocess (~1ms).
+pub fn detect_brew() -> BrewStatus {
     let Some(path) = resolve_brew_path() else {
         return BrewStatus {
             installed: false,
@@ -84,16 +85,26 @@ pub fn check_brew() -> BrewStatus {
         };
     };
 
-    let path_str = path.to_string_lossy().into_owned();
-    let version = run_brew(&["--version"])
-        .ok()
-        .and_then(|output| brew_output_success(output).ok());
-
     BrewStatus {
         installed: true,
-        path: Some(path_str),
-        version,
+        path: Some(path.to_string_lossy().into_owned()),
+        version: None,
     }
+}
+
+/// Slow path: runs `brew --version` after the UI shell is visible.
+pub fn brew_version() -> Option<String> {
+    run_brew(&["--version"])
+        .ok()
+        .and_then(|output| brew_output_success(output).ok())
+}
+
+pub fn check_brew() -> BrewStatus {
+    let mut status = detect_brew();
+    if status.installed {
+        status.version = brew_version();
+    }
+    status
 }
 
 pub fn get_installed_formula_names() -> Result<Vec<String>, String> {

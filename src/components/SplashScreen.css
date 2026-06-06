@@ -4,7 +4,6 @@
   justify-content: center;
   height: 100vh;
   background-color: #f6f6f6;
-  animation: splash-fade-in 0.3s ease-out;
 }
 
 .splash-content {
@@ -47,16 +46,6 @@
 @keyframes splash-spin {
   to {
     transform: rotate(360deg);
-  }
-}
-
-@keyframes splash-fade-in {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
   }
 }
 
