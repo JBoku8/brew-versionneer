@@ -1,0 +1,104 @@
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #0f0f0f;
+  background-color: #f6f6f6;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app-shell > .install-brew {
+  flex-shrink: 0;
+  max-height: 45vh;
+  overflow-y: auto;
+  border-bottom: 1px solid #ddd;
+}
+
+.browse-without-brew {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.section-label {
+  margin: 0;
+  padding: 0.5rem 1.25rem 0;
+  font-size: 0.8rem;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+input,
+button {
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  padding: 0.5em 1em;
+  font-size: 0.95em;
+  font-family: inherit;
+  color: inherit;
+  background-color: #fff;
+  transition: border-color 0.2s;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: #396cd8;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+a {
+  color: #396cd8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color: #f0f0f0;
+    background-color: #1e1e1e;
+  }
+
+  input,
+  button {
+    background-color: #2a2a2a;
+    border-color: #444;
+  }
+
+  .app-shell > .install-brew {
+    border-bottom-color: #444;
+  }
+
+  .section-label {
+    color: #999;
+  }
+}

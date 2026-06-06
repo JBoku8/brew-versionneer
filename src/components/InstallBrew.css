@@ -1,0 +1,43 @@
+.install-brew {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: left;
+}
+
+.install-brew h1 {
+  margin-bottom: 0.5rem;
+}
+
+.install-command {
+  background: #1a1a2e;
+  color: #e8e8f0;
+  padding: 1rem;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.install-note,
+.install-remote-note {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.install-brew ul {
+  padding-left: 1.25rem;
+}
+
+.install-brew button {
+  margin-top: 1rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .install-note,
+  .install-remote-note {
+    color: #aaa;
+  }
+}

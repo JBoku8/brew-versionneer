@@ -1,0 +1,77 @@
+.package-detail {
+  flex: 1;
+  min-width: 280px;
+  max-width: 420px;
+  padding: 1rem 1.25rem;
+  border-left: 1px solid #ddd;
+  overflow-y: auto;
+  text-align: left;
+}
+
+.package-detail h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
+  word-break: break-word;
+}
+
+.detail-version,
+.detail-meta {
+  margin: 0.25rem 0;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.detail-installed {
+  color: #2a7a47;
+}
+
+.detail-outdated {
+  color: #b85c00;
+  font-weight: 500;
+}
+
+.detail-desc {
+  margin: 0.75rem 0;
+  line-height: 1.5;
+}
+
+.detail-placeholder {
+  color: #888;
+  font-style: italic;
+}
+
+.detail-raw {
+  margin-top: 1.5rem;
+}
+
+.detail-raw pre {
+  font-size: 0.7rem;
+  max-height: 240px;
+  overflow: auto;
+  background: #f4f4f4;
+  padding: 0.5rem;
+  border-radius: 4px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .package-detail {
+    border-left-color: #444;
+  }
+
+  .detail-version,
+  .detail-meta {
+    color: #aaa;
+  }
+
+  .detail-installed {
+    color: #5fd98a;
+  }
+
+  .detail-outdated {
+    color: #ffb266;
+  }
+
+  .detail-raw pre {
+    background: #1a1a1a;
+  }
+}

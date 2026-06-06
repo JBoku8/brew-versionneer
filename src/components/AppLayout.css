@@ -1,0 +1,105 @@
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid #ddd;
+  flex-shrink: 0;
+}
+
+.app-title h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  text-align: left;
+}
+
+.brew-version {
+  display: block;
+  font-size: 0.75rem;
+  color: #666;
+  font-weight: 400;
+}
+
+.brew-missing-badge {
+  font-size: 0.8rem;
+  padding: 0.25rem 0.5rem;
+  background: #fff3cd;
+  color: #856404;
+  border-radius: 4px;
+}
+
+.app-tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid #eee;
+  flex-shrink: 0;
+}
+
+.tab {
+  padding: 0.4em 1em;
+  font-size: 0.9rem;
+  background: transparent;
+  box-shadow: none;
+}
+
+.tab.active {
+  background: #396cd8;
+  color: #fff;
+}
+
+.tab:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.tab-description {
+  margin: 0;
+  padding: 0.4rem 1.25rem;
+  font-size: 0.8rem;
+  color: #666;
+  border-bottom: 1px solid #eee;
+  flex-shrink: 0;
+}
+
+.app-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (prefers-color-scheme: dark) {
+  .app-header {
+    border-bottom-color: #444;
+  }
+
+  .brew-version {
+    color: #aaa;
+  }
+
+  .brew-missing-badge {
+    background: #3d3520;
+    color: #e0c060;
+  }
+
+  .app-tabs {
+    border-bottom-color: #333;
+  }
+
+  .tab-description {
+    color: #999;
+    border-bottom-color: #333;
+  }
+
+  .tab.active {
+    background: #4a7fd4;
+  }
+}
