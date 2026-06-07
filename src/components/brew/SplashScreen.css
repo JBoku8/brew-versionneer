@@ -3,7 +3,7 @@
   align-items: center;
   justify-content: center;
   height: 100vh;
-  background-color: #f6f6f6;
+  background-color: var(--bg-page);
 }
 
 .splash-content {
@@ -18,8 +18,8 @@
   width: 32px;
   height: 32px;
   margin-bottom: 0.75rem;
-  border: 3px solid #ddd;
-  border-top-color: #396cd8;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
   border-radius: 50%;
   animation: splash-spin 0.8s linear infinite;
 }
@@ -28,43 +28,23 @@
   margin: 0;
   font-size: 1.5rem;
   font-weight: 600;
-  color: #0f0f0f;
+  color: var(--text);
 }
 
 .splash-tagline {
   margin: 0;
   font-size: 0.9rem;
-  color: #666;
+  color: var(--text-muted);
 }
 
 .splash-message {
   margin: 0.75rem 0 0;
   font-size: 0.85rem;
-  color: #666;
+  color: var(--text-muted);
 }
 
 @keyframes splash-spin {
   to {
     transform: rotate(360deg);
-  }
-}
-
-@media (prefers-color-scheme: dark) {
-  .splash-screen {
-    background-color: #1e1e1e;
-  }
-
-  .splash-spinner {
-    border-color: #444;
-    border-top-color: #396cd8;
-  }
-
-  .splash-title {
-    color: #f0f0f0;
-  }
-
-  .splash-tagline,
-  .splash-message {
-    color: #999;
   }
 }

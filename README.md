@@ -7,7 +7,7 @@ Browse installed formulae via the `brew` CLI, or explore the public [formulae.br
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) (v18+)
-- [Rust](https://rustup.rs/) (stable)
+- [Rust](https://rustup.rs/) 1.85+ (stable)
 - macOS: Xcode Command Line Tools
 - **Homebrew** (optional for Installed tab; required to list local packages)
 

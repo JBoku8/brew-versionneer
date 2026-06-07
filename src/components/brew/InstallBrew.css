@@ -10,6 +10,7 @@
 }
 
 .install-command {
+  /* Intentionally dark — this is a terminal/code block, always dark regardless of theme */
   background: #1a1a2e;
   color: #e8e8f0;
   padding: 1rem;
@@ -23,7 +24,7 @@
 
 .install-note,
 .install-remote-note {
-  color: #666;
+  color: var(--text-muted);
   font-size: 0.9rem;
 }
 
@@ -33,11 +34,4 @@
 
 .install-brew button {
   margin-top: 1rem;
-}
-
-@media (prefers-color-scheme: dark) {
-  .install-note,
-  .install-remote-note {
-    color: #aaa;
-  }
 }

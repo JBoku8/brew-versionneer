@@ -1,9 +1,10 @@
+import { ThemeProvider } from "./contexts/ThemeContext";
 import { useBrew } from "./hooks/useBrew";
 import { AppShell } from "./components/layout";
 import { InstallBrew } from "./components/brew";
 import "./App.css";
 
-function App() {
+function AppContent() {
   const { status, checking, refresh } = useBrew();
 
   const showInstallBrew = status !== null && !status.installed;
@@ -21,6 +22,14 @@ function App() {
   }
 
   return <AppShell brewStatus={status} brewChecking={checking} />;
+}
+
+function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
+  );
 }
 
 export default App;

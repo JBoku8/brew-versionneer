@@ -8,17 +8,26 @@ import {
   writeConfig,
   writeKeychain,
 } from "../../api/config";
+import { useTheme } from "../../contexts/ThemeContext";
 import { MODEL_SUGGESTIONS, TTL_OPTIONS } from "../../constants/settings";
 import { loadAppConfig } from "../../lib/config";
 import { testLlmConnection } from "../../lib/llm";
+import { ThemePreference } from "../../lib/theme";
 import { ConnectionStatus } from "../../models/ui";
 import "./SettingsView.css";
+
+const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
+  { value: "light", label: "Light" },
+  { value: "system", label: "System" },
+  { value: "dark", label: "Dark" },
+];
 
 interface SettingsViewProps {
   onConfigSaved?: (config: AppConfig, apiKey: string | null) => void;
 }
 
 export function SettingsView({ onConfigSaved }: SettingsViewProps) {
+  const { theme, setTheme } = useTheme();
   // Form state
   const [endpoint, setEndpoint] = useState(DEFAULT_CONFIG.llm.endpoint);
   const [model, setModel] = useState(DEFAULT_CONFIG.llm.model);
@@ -115,6 +124,27 @@ export function SettingsView({ onConfigSaved }: SettingsViewProps) {
   return (
     <div className="settings-view">
       <h2 className="settings-title">Settings</h2>
+
+      {/* ── Appearance ────────────────────────────────── */}
+      <section className="settings-section">
+        <h3 className="settings-section-title">Appearance</h3>
+        <p className="settings-section-desc">
+          Choose how the app looks. "System" follows your macOS appearance setting.
+        </p>
+        <div className="settings-theme-picker" role="group" aria-label="Color theme">
+          {THEME_OPTIONS.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              className={`settings-theme-btn${theme === value ? " active" : ""}`}
+              aria-pressed={theme === value}
+              onClick={() => setTheme(value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </section>
 
       {/* ── AI Assistant ──────────────────────────────── */}
       <section className="settings-section">

@@ -1,27 +1,204 @@
+/* ── CSS color tokens ─────────────────────────────────────────────────────────
+   All color values live here as custom properties. Component CSS files use
+   var(--token) exclusively — no hardcoded hex outside this block.
+
+   Three-mode theming:
+     "system" (default) → data-theme attribute absent; media query controls dark
+     "light"            → data-theme="light"; suppresses dark media query
+     "dark"             → data-theme="dark"; forces dark tokens regardless of OS
+──────────────────────────────────────────────────────────────────────────── */
+
 :root {
+  /* Tell the browser which color schemes this page supports.
+     This makes WebKit render native controls (scrollbars, inputs, etc.)
+     in the right mode instead of always using the OS default. */
+  color-scheme: light dark;
+
+  /* Backgrounds */
+  --bg-page:              #f6f6f6;
+  --bg-raised:            #ffffff;
+  --bg-sidebar:           #f0f2f5;
+  --bg-input:             #fafafa;
+  --bg-code:              #f4f4f4;
+  --bg-hover:             rgba(0, 0, 0, 0.06);
+  --bg-hover-list:        #f5f7ff;
+  --bg-selected:          #e8eeff;
+
+  /* Borders */
+  --border:               #ddd;
+  --border-subtle:        #eee;
+  --border-faint:         #f0f0f0;
+
+  /* Text */
+  --text:                 #0f0f0f;
+  --text-2:               #555;
+  --text-muted:           #666;
+  --text-faint:           #888;
+  --text-dim:             #aaa;
+  --text-label:           #444;
+
+  /* Accent (interactive blue) */
+  --accent:               #396cd8;
+  --accent-hover:         #2f5bbf;
+
+  /* Semantic */
+  --success:              #2a7a47;
+  --warning:              #b85c00;
+  --bg-badge-outdated:    #fff0e6;
+  --bg-badge-uptodate:    #edfbf0;
+  --border-badge-outdated:#f5c49a;
+  --border-badge-uptodate:#a8e6bb;
+  --bg-error:             #fee;
+  --text-error:           #a33;
+
+  /* Base styles */
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   font-size: 16px;
   line-height: 1.5;
   font-weight: 400;
-  color: #0f0f0f;
-  background-color: #f6f6f6;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  color: var(--text);
+  background-color: var(--bg-page);
 }
+
+/* Dark tokens — system preference (suppressed when user forces light or dark) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) {
+    --bg-page:              #1e1e1e;
+    --bg-raised:            #252830;
+    --bg-sidebar:           #1e2027;
+    --bg-input:             #1e2027;
+    --bg-code:              #1a1a1a;
+    --bg-hover:             rgba(255, 255, 255, 0.08);
+    --bg-hover-list:        #2a2d3a;
+    --bg-selected:          #2d3548;
+
+    --border:               #444;
+    --border-subtle:        #333;
+    --border-faint:         #333;
+
+    --text:                 #f0f0f0;
+    --text-2:               #aaa;
+    --text-muted:           #888;
+    --text-faint:           #666;
+    --text-dim:             #555;
+    --text-label:           #ccc;
+
+    --accent:               #4a7fd4;
+    --accent-hover:         #3d6fbe;
+
+    --success:              #5fd98a;
+    --warning:              #ffb266;
+    --bg-badge-outdated:    #3d2200;
+    --bg-badge-uptodate:    #0d2e18;
+    --border-badge-outdated:#7a4400;
+    --border-badge-uptodate:#1e5c35;
+    --bg-error:             #3a2020;
+    --text-error:           #f88;
+  }
+}
+
+/* Light tokens — forced by user ("Light" in Settings).
+   The :root defaults are already light, so we only need to override color-scheme
+   so WebKit renders native controls and the WebView background in light mode. */
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+/* Dark tokens — forced by user ("Dark" in Settings) */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg-page:              #1e1e1e;
+  --bg-raised:            #252830;
+  --bg-sidebar:           #1e2027;
+  --bg-input:             #1e2027;
+  --bg-code:              #1a1a1a;
+  --bg-hover:             rgba(255, 255, 255, 0.08);
+  --bg-hover-list:        #2a2d3a;
+  --bg-selected:          #2d3548;
+
+  --border:               #444;
+  --border-subtle:        #333;
+  --border-faint:         #333;
+
+  --text:                 #f0f0f0;
+  --text-2:               #aaa;
+  --text-muted:           #888;
+  --text-faint:           #666;
+  --text-dim:             #555;
+  --text-label:           #ccc;
+
+  --accent:               #4a7fd4;
+  --accent-hover:         #3d6fbe;
+
+  --success:              #5fd98a;
+  --warning:              #ffb266;
+  --bg-badge-outdated:    #3d2200;
+  --bg-badge-uptodate:    #0d2e18;
+  --border-badge-outdated:#7a4400;
+  --border-badge-uptodate:#1e5c35;
+  --bg-error:             #3a2020;
+  --text-error:           #f88;
+}
+
+/* ── Reset & layout ───────────────────────────────────────────────────────── */
 
 * {
   box-sizing: border-box;
 }
 
 html,
-body,
-#root {
+body {
   margin: 0;
   height: 100%;
   overflow: hidden;
+  /* Explicit background/color ensures transparent elements don't bleed
+     the WebKit dark-mode default through in forced-light mode. */
+  background-color: var(--bg-page);
+  color: var(--text);
 }
+
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ── Shared element styles ────────────────────────────────────────────────── */
+
+input,
+button {
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  padding: 0.5em 1em;
+  font-size: 0.95em;
+  font-family: inherit;
+  color: inherit;
+  background-color: var(--bg-input);
+  transition: border-color 0.2s;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+a {
+  color: var(--accent);
+}
+
+/* ── No-brew layout ───────────────────────────────────────────────────────── */
 
 .no-brew-shell {
   display: flex;
@@ -34,7 +211,7 @@ body,
   flex-shrink: 0;
   max-height: 45vh;
   overflow-y: auto;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid var(--border);
 }
 
 .browse-without-brew {
@@ -48,57 +225,7 @@ body,
   margin: 0;
   padding: 0.5rem 1.25rem 0;
   font-size: 0.8rem;
-  color: #666;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-}
-
-input,
-button {
-  border-radius: 8px;
-  border: 1px solid #ccc;
-  padding: 0.5em 1em;
-  font-size: 0.95em;
-  font-family: inherit;
-  color: inherit;
-  background-color: #fff;
-  transition: border-color 0.2s;
-}
-
-button {
-  cursor: pointer;
-}
-
-button:hover:not(:disabled) {
-  border-color: #396cd8;
-}
-
-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-a {
-  color: #396cd8;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: #f0f0f0;
-    background-color: #1e1e1e;
-  }
-
-  input,
-  button {
-    background-color: #2a2a2a;
-    border-color: #444;
-  }
-
-  .no-brew-shell > .install-brew {
-    border-bottom-color: #444;
-  }
-
-  .section-label {
-    color: #999;
-  }
 }

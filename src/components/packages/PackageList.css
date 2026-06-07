@@ -11,7 +11,7 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
 }
 
@@ -23,7 +23,7 @@
 
 .browser-count {
   font-size: 0.85rem;
-  color: #666;
+  color: var(--text-muted);
   white-space: nowrap;
 }
 
@@ -35,8 +35,8 @@
 .browser-error {
   margin: 0.5rem 1rem;
   padding: 0.5rem 0.75rem;
-  background: #fee;
-  color: #a33;
+  background: var(--bg-error);
+  color: var(--text-error);
   border-radius: 6px;
   font-size: 0.9rem;
 }
@@ -62,14 +62,14 @@
   margin: 0 -2px;
   cursor: col-resize;
   background: transparent;
-  border-left: 1px solid #eee;
-  border-right: 1px solid #eee;
+  border-left: 1px solid var(--border-subtle);
+  border-right: 1px solid var(--border-subtle);
   z-index: 1;
 }
 
 .column-resize-handle:hover,
 .column-resize-handle.active {
-  background: #d8d8d8;
+  background: var(--border);
 }
 
 .detail-column {
@@ -100,16 +100,16 @@
   border-radius: 0;
   background: transparent;
   box-shadow: none;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border-faint);
 }
 
 .list-item:hover {
-  background: #f5f7ff;
+  background: var(--bg-hover-list);
 }
 
 .list-item.selected {
-  background: #e8eeff;
-  border-color: #dde4ff;
+  background: var(--bg-selected);
+  border-color: var(--border-subtle);
 }
 
 .list-item-header {
@@ -143,32 +143,32 @@
 }
 
 .badge.outdated {
-  background: #fff0e6;
-  color: #b85c00;
-  border: 1px solid #f5c49a;
+  background: var(--bg-badge-outdated);
+  color: var(--warning);
+  border: 1px solid var(--border-badge-outdated);
 }
 
 .badge.uptodate {
-  background: #edfbf0;
-  color: #2a7a47;
-  border: 1px solid #a8e6bb;
+  background: var(--bg-badge-uptodate);
+  color: var(--success);
+  border: 1px solid var(--border-badge-uptodate);
 }
 
 .filter-btn {
   font-size: 0.85rem;
   padding: 0.4em 0.8em;
-  background: #fff0e6;
-  color: #b85c00;
-  border: 1px solid #f5c49a;
+  background: var(--bg-badge-outdated);
+  color: var(--warning);
+  border: 1px solid var(--border-badge-outdated);
   border-radius: 6px;
   cursor: pointer;
   white-space: nowrap;
 }
 
 .filter-btn.active {
-  background: #b85c00;
+  background: var(--warning);
   color: #fff;
-  border-color: #b85c00;
+  border-color: var(--warning);
 }
 
 .filter-btn:hover {
@@ -177,7 +177,7 @@
 
 .list-item-desc {
   font-size: 0.8rem;
-  color: #666;
+  color: var(--text-muted);
   margin-top: 0.15rem;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -187,7 +187,7 @@
 
 .list-placeholder {
   padding: 2rem 1rem;
-  color: #888;
+  color: var(--text-faint);
   font-style: italic;
 }
 
@@ -198,88 +198,14 @@
   padding: 0.5rem 1rem;
   font-size: 0.85rem;
   border: none;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--border-subtle);
   border-radius: 0;
-  background: #f8f8f8;
+  background: var(--bg-input);
   box-shadow: none;
   cursor: pointer;
   text-align: center;
 }
 
 .load-more:hover {
-  background: #f0f0f0;
-}
-
-@media (prefers-color-scheme: dark) {
-  .browser-toolbar {
-    border-bottom-color: #444;
-  }
-
-  .browser-count {
-    color: #aaa;
-  }
-
-  .browser-error {
-    background: #3a2020;
-    color: #f88;
-  }
-
-  .column-resize-handle {
-    border-left-color: #333;
-    border-right-color: #333;
-  }
-
-  .column-resize-handle:hover,
-  .column-resize-handle.active {
-    background: #444;
-  }
-
-  .load-more {
-    background: #2a2a2a;
-    border-bottom-color: #333;
-  }
-
-  .load-more:hover {
-    background: #333;
-  }
-
-  .list-item {
-    border-bottom-color: #333;
-  }
-
-  .list-item:hover {
-    background: #2a2d3a;
-  }
-
-  .list-item.selected {
-    background: #2d3548;
-  }
-
-  .list-item-desc {
-    color: #aaa;
-  }
-
-  .badge.outdated {
-    background: #3d2200;
-    color: #ffb266;
-    border-color: #7a4400;
-  }
-
-  .badge.uptodate {
-    background: #0d2e18;
-    color: #5fd98a;
-    border-color: #1e5c35;
-  }
-
-  .filter-btn {
-    background: #3d2200;
-    color: #ffb266;
-    border-color: #7a4400;
-  }
-
-  .filter-btn.active {
-    background: #b85c00;
-    color: #fff;
-    border-color: #b85c00;
-  }
+  background: var(--bg-hover-list);
 }
