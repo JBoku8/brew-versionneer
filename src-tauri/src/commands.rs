@@ -1,4 +1,5 @@
 use crate::brew::{self, BrewStatus};
+use crate::config::{self, AppConfig};
 use crate::remote::{self, CatalogKind};
 use serde_json::Value;
 use tauri::AppHandle;
@@ -75,10 +76,57 @@ pub async fn fetch_formula_detail(name: String) -> Result<Value, String> {
     remote::fetch_formula_detail(&name).await
 }
 
+// ── Config commands ───────────────────────────────────────────────────────────
+
+/// Read app configuration from Application Support. Returns defaults if the file is absent.
+#[tauri::command]
+pub fn read_config(app: AppHandle) -> AppConfig {
+    let data_dir = match app_data_dir(&app) {
+        Ok(d) => d,
+        Err(_) => return AppConfig::default(),
+    };
+    config::read_config(&data_dir)
+}
+
+/// Persist app configuration to Application Support (API key excluded — use write_keychain).
+#[tauri::command]
+pub fn write_config(app: AppHandle, config: AppConfig) -> Result<(), String> {
+    let data_dir = app_data_dir(&app)?;
+    config::write_config(&data_dir, &config)
+}
+
+// ── Keychain commands ─────────────────────────────────────────────────────────
+
+/// Read a secret from the macOS Keychain. Returns `null` if not found.
+#[tauri::command]
+pub fn read_keychain(service: String, account: String) -> Option<String> {
+    config::keychain_read(&service, &account)
+}
+
+/// Store a secret in the macOS Keychain (creates or replaces the entry).
+#[tauri::command]
+pub fn write_keychain(service: String, account: String, secret: String) -> Result<(), String> {
+    config::keychain_write(&service, &account, &secret)
+}
+
+/// Delete a secret from the macOS Keychain. Succeeds silently if the entry does not exist.
+#[tauri::command]
+pub fn delete_keychain(service: String, account: String) -> Result<(), String> {
+    config::keychain_delete(&service, &account)
+}
+
+// ── Directory helpers ─────────────────────────────────────────────────────────
+
 fn app_cache_dir(app: &AppHandle) -> Result<std::path::PathBuf, String> {
     let base = app
         .path()
         .app_cache_dir()
         .map_err(|e| e.to_string())?;
     Ok(remote::cache_dir_from_app(base))
+}
+
+fn app_data_dir(app: &AppHandle) -> Result<std::path::PathBuf, String> {
+    app.path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())
 }

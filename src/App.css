@@ -23,14 +23,14 @@ body,
   overflow: hidden;
 }
 
-.app-shell {
+.no-brew-shell {
   display: flex;
   flex-direction: column;
   height: 100vh;
   overflow: hidden;
 }
 
-.app-shell > .install-brew {
+.no-brew-shell > .install-brew {
   flex-shrink: 0;
   max-height: 45vh;
   overflow-y: auto;
@@ -94,7 +94,7 @@ a {
     border-color: #444;
   }
 
-  .app-shell > .install-brew {
+  .no-brew-shell > .install-brew {
     border-bottom-color: #444;
   }
 

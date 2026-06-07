@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { LLMConfig } from "../api/config";
 import {
   OutdatedResult,
   PackageRecord,
@@ -19,6 +20,9 @@ interface PackageListProps {
   outdatedResult: OutdatedResult;
   installedReady: boolean;
   onRefreshInstalled: () => void;
+  llmConfig: LLMConfig | null;
+  apiKey: string | null;
+  onOpenSettings: () => void;
 }
 
 const PAGE_SIZE = 100;
@@ -30,6 +34,9 @@ export function PackageList({
   outdatedResult,
   installedReady,
   onRefreshInstalled,
+  llmConfig,
+  apiKey,
+  onOpenSettings,
 }: PackageListProps) {
   const [packages, setPackages] = useState<PackageRecord[]>([]);
   const [selected, setSelected] = useState<PackageRecord | null>(null);
@@ -307,7 +314,13 @@ export function PackageList({
           </button>
         )}
 
-        <PackageDetail pkg={selected} loading={detailLoading} />
+        <PackageDetail
+          pkg={selected}
+          loading={detailLoading}
+          llmConfig={llmConfig}
+          apiKey={apiKey}
+          onOpenSettings={onOpenSettings}
+        />
       </div>
     </div>
   );

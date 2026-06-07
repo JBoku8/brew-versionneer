@@ -1,5 +1,6 @@
 mod brew;
 mod commands;
+mod config;
 mod remote;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -18,6 +19,11 @@ pub fn run() {
             commands::fetch_formulae_catalog,
             commands::fetch_casks_catalog,
             commands::fetch_formula_detail,
+            commands::read_config,
+            commands::write_config,
+            commands::read_keychain,
+            commands::write_keychain,
+            commands::delete_keychain,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

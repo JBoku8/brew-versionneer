@@ -1,32 +1,104 @@
 Scaffold a new end-to-end Tauri IPC command for the Brew Versionneer project.
 
-The user will describe what the command should do. Follow the exact pattern used by existing commands:
+Ask the user what the command should do, what arguments it takes, and what it returns if not clear from context. Then follow these steps exactly.
 
-**Step 1 — Rust implementation (`src-tauri/src/brew.rs` or `remote.rs`)**
-Add a `pub fn` that runs the brew CLI or HTTP request and returns `Result<serde_json::Value, String>`.
-Use `run_brew(&[...])` + `brew_output_success(output)?` for CLI commands.
+---
 
-**Step 2 — Tauri command wrapper (`src-tauri/src/commands.rs`)**
+## Step 1 — Implement the Rust function
+
+Choose the right module:
+- **`src-tauri/src/brew.rs`** — for Homebrew CLI calls (use `run_brew` + `brew_output_success`)
+- **`src-tauri/src/remote.rs`** — for HTTP fetches to formulae.brew.sh
+- **`src-tauri/src/config.rs`** — for app config file or macOS Keychain operations
+
+**CLI command pattern (brew.rs):**
+```rust
+pub fn my_fn() -> Result<serde_json::Value, String> {
+    let output = run_brew(&["list", "--versions"])?;
+    let stdout = brew_output_success(output)?;
+    // parse stdout into a Value or struct
+    serde_json::from_str(&stdout).map_err(|e| format!("JSON parse error: {e}"))
+}
+```
+
+**Config/keychain pattern (config.rs):**
+```rust
+pub fn my_config_fn(data_dir: &Path) -> Result<AppConfig, String> {
+    // reuse read_config / write_config / keychain_read / keychain_write helpers
+}
+```
+
+---
+
+## Step 2 — Add a Tauri command wrapper in `src-tauri/src/commands.rs`
+
+**Sync command (no app paths needed):**
 ```rust
 #[tauri::command]
-pub fn my_command_name() -> Result<Value, String> {
-    brew::my_rust_fn()
+pub fn my_command() -> Result<Value, String> {
+    brew::my_fn()
 }
 ```
-Use `async` + `AppHandle` only if the command needs the app cache dir (like catalog fetches).
 
-**Step 3 — Register in handler (`src-tauri/src/lib.rs`)**
-Add `commands::my_command_name` to the `invoke_handler![]` list.
+**Async command (needs app cache or data dir):**
+```rust
+#[tauri::command]
+pub async fn my_command(app: AppHandle) -> Result<Value, String> {
+    let dir = app_cache_dir(&app)?;   // or app_data_dir(&app)?
+    // ...
+}
+```
 
-**Step 4 — TypeScript wrapper (`src/api/tauri.ts`)**
+Use `app_cache_dir` for catalog caches, `app_data_dir` for config/persistent data.
+Both helpers are already defined at the bottom of `commands.rs`.
+`AppHandle` requires `use tauri::Manager;` — already imported at the top of `commands.rs`.
+
+---
+
+## Step 3 — Register in `src-tauri/src/lib.rs`
+
+Add to the `invoke_handler![]` list:
+```rust
+commands::my_command,
+```
+
+**This step is mandatory** — omitting it causes silent IPC failure at runtime with no compile error.
+
+---
+
+## Step 4 — Add a TypeScript wrapper
+
+Put it in the right file:
+- **`src/api/tauri.ts`** — for brew/catalog/package commands
+- **`src/api/config.ts`** — for config file or keychain commands
+
 ```typescript
-export function myCommandName(): Promise<ReturnType> {
-  return invoke<ReturnType>("my_command_name");
+export function myCommand(arg: string): Promise<ReturnType> {
+  return invoke<ReturnType>("my_command", { arg });
 }
 ```
-Add any new interfaces/types above the function.
 
-**Step 5 — Verify**
-Run `cd src-tauri && cargo build` then `npx tsc --noEmit`. Fix any errors before finishing.
+Tauri converts camelCase JS params to snake_case Rust params automatically — pass `{ forceRefresh }` and the Rust side receives `force_refresh`.
 
-Ask the user what the command should do, what arguments it takes, and what it returns if not clear from context.
+---
+
+## Step 5 — Verify
+
+```bash
+cd src-tauri && cargo build   # Rust must compile cleanly
+npx tsc --noEmit              # TypeScript must have no errors
+```
+
+Fix any errors before finishing. Common issues:
+- Forgot `mod my_module;` in `lib.rs` if you created a new `.rs` file.
+- New crate in `Cargo.toml` may need `features = [...]` — check crate docs.
+- Unused import or param → TypeScript `noUnusedLocals`/`noUnusedParameters` will error.
+
+---
+
+## Current command registry (15 commands as of last update)
+
+`check_brew`, `detect_brew`, `get_brew_version`, `get_installed_versions`, `get_outdated_formulae`,
+`get_installed_formulae`, `get_installed_formula_names`, `fetch_formulae_catalog`,
+`fetch_casks_catalog`, `fetch_formula_detail`, `read_config`, `write_config`,
+`read_keychain`, `write_keychain`, `delete_keychain`

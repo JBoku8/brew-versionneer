@@ -1,3 +1,4 @@
+import { LLMConfig } from "../api/config";
 import {
   PackageRecord,
   packageDescription,
@@ -5,14 +6,18 @@ import {
   packageName,
   packageVersion,
 } from "../api/tauri";
+import { AISection } from "./AISection";
 import "./PackageDetail.css";
 
 interface PackageDetailProps {
   pkg: PackageRecord | null;
   loading?: boolean;
+  llmConfig: LLMConfig | null;
+  apiKey: string | null;
+  onOpenSettings: () => void;
 }
 
-export function PackageDetail({ pkg, loading }: PackageDetailProps) {
+export function PackageDetail({ pkg, loading, llmConfig, apiKey, onOpenSettings }: PackageDetailProps) {
   if (loading) {
     return (
       <aside className="package-detail">
@@ -68,6 +73,13 @@ export function PackageDetail({ pkg, loading }: PackageDetailProps) {
         <summary>Raw JSON</summary>
         <pre>{JSON.stringify(pkg, null, 2)}</pre>
       </details>
+
+      <AISection
+        pkg={pkg}
+        llmConfig={llmConfig}
+        apiKey={apiKey}
+        onOpenSettings={onOpenSettings}
+      />
     </aside>
   );
 }
