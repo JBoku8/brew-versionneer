@@ -1,10 +1,11 @@
+import { DEFAULT_SPLASH_MESSAGE } from "../../constants/messages";
 import "./SplashScreen.css";
 
 interface SplashScreenProps {
   message?: string;
 }
 
-export function SplashScreen({ message = "Checking for Homebrew…" }: SplashScreenProps) {
+export function SplashScreen({ message = DEFAULT_SPLASH_MESSAGE }: SplashScreenProps) {
   return (
     <div className="splash-screen">
       <div className="splash-content">

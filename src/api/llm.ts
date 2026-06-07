@@ -1,5 +1,13 @@
 import { LLMConfig } from "./config";
-import { PackageRecord, packageDescription, packageHomepage, packageName, packageVersion } from "./tauri";
+import { buildChatCompletionsUrl } from "../lib/llm";
+import { getInstalledVersionString, getLatestVersionString } from "../lib/package";
+import {
+  PackageRecord,
+  packageDescription,
+  packageHomepage,
+  packageName,
+  packageVersion,
+} from "./tauri";
 
 export interface ChatMessage {
   role: "user" | "assistant";
@@ -17,10 +25,8 @@ function buildContext(pkg: PackageRecord): string {
   const name = packageName(pkg);
   const desc = packageDescription(pkg);
   const version = packageVersion(pkg);
-  const installed =
-    typeof pkg.installedVersion === "string" ? pkg.installedVersion : null;
-  const latest =
-    typeof pkg.latestVersion === "string" ? pkg.latestVersion : null;
+  const installed = getInstalledVersionString(pkg);
+  const latest = getLatestVersionString(pkg);
   const tap = typeof pkg.tap === "string" ? pkg.tap : null;
   const homepage = packageHomepage(pkg);
 
@@ -47,8 +53,7 @@ export async function askAboutPackage(
   history: ChatMessage[],
   question: string,
 ): Promise<string> {
-  const baseUrl = config.endpoint.replace(/\/$/, "");
-  const url = `${baseUrl}/chat/completions`;
+  const url = buildChatCompletionsUrl(config.endpoint);
 
   const context = buildContext(pkg);
   const userContent = `${context}\n\nQuestion: ${question}`;

@@ -1,14 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { LLMConfig } from "../api/config";
-import { ChatMessage, askAboutPackage } from "../api/llm";
-import { PackageRecord, packageName } from "../api/tauri";
+import { ChatMessage, askAboutPackage } from "../../api/llm";
+import { PackageRecord, packageName } from "../../api/tauri";
+import { getErrorMessage } from "../../lib/errors";
+import { LlmContextProps } from "../../models/ui";
 import "./AISection.css";
 
-interface AISectionProps {
+interface AISectionProps extends LlmContextProps {
   pkg: PackageRecord;
-  llmConfig: LLMConfig | null;
-  apiKey: string | null;
-  onOpenSettings: () => void;
 }
 
 export function AISection({ pkg, llmConfig, apiKey, onOpenSettings }: AISectionProps) {
@@ -18,6 +16,7 @@ export function AISection({ pkg, llmConfig, apiKey, onOpenSettings }: AISectionP
   const [error, setError] = useState<string | null>(null);
   const threadRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const pkgName = packageName(pkg);
 
   // Reset conversation when the selected package changes
   useEffect(() => {
@@ -25,7 +24,7 @@ export function AISection({ pkg, llmConfig, apiKey, onOpenSettings }: AISectionP
     setInput("");
     setError(null);
     setLoading(false);
-  }, [packageName(pkg)]);
+  }, [pkgName]);
 
   // Scroll to bottom after each new message
   useEffect(() => {
@@ -48,7 +47,7 @@ export function AISection({ pkg, llmConfig, apiKey, onOpenSettings }: AISectionP
       const reply = await askAboutPackage(llmConfig, apiKey, pkg, history, q);
       setHistory((h) => [...h, { role: "assistant", content: reply }]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
+      setError(getErrorMessage(err));
       // Remove the user message on failure so they can retry
       setHistory((h) => h.slice(0, -1));
       setInput(q);
@@ -64,8 +63,6 @@ export function AISection({ pkg, llmConfig, apiKey, onOpenSettings }: AISectionP
       void handleAsk();
     }
   };
-
-  const name = packageName(pkg);
 
   // ── Not configured ────────────────────────────────
   if (!llmConfig || !apiKey) {
@@ -85,7 +82,7 @@ export function AISection({ pkg, llmConfig, apiKey, onOpenSettings }: AISectionP
   // ── Configured ────────────────────────────────────
   return (
     <div className="ai-section">
-      <p className="ai-section-title">💬 Ask about {name}</p>
+      <p className="ai-section-title">💬 Ask about {pkgName}</p>
 
       {history.length > 0 && (
         <div className="ai-thread" ref={threadRef}>
@@ -119,7 +116,7 @@ export function AISection({ pkg, llmConfig, apiKey, onOpenSettings }: AISectionP
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={history.length === 0 ? `Ask about ${name}…` : "Follow-up question…"}
+          placeholder={history.length === 0 ? `Ask about ${pkgName}…` : "Follow-up question…"}
           rows={2}
           disabled={loading}
         />

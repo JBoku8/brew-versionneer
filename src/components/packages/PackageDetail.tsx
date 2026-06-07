@@ -1,23 +1,32 @@
-import { LLMConfig } from "../api/config";
 import {
   PackageRecord,
   packageDescription,
   packageHomepage,
   packageName,
   packageVersion,
-} from "../api/tauri";
+} from "../../api/tauri";
+import {
+  formatLicense,
+  getInstalledVersionString,
+  getLatestVersionString,
+  isPackageOutdated,
+} from "../../lib/package";
+import { LlmContextProps } from "../../models/ui";
 import { AISection } from "./AISection";
 import "./PackageDetail.css";
 
-interface PackageDetailProps {
+interface PackageDetailProps extends LlmContextProps {
   pkg: PackageRecord | null;
   loading?: boolean;
-  llmConfig: LLMConfig | null;
-  apiKey: string | null;
-  onOpenSettings: () => void;
 }
 
-export function PackageDetail({ pkg, loading, llmConfig, apiKey, onOpenSettings }: PackageDetailProps) {
+export function PackageDetail({
+  pkg,
+  loading,
+  llmConfig,
+  apiKey,
+  onOpenSettings,
+}: PackageDetailProps) {
   if (loading) {
     return (
       <aside className="package-detail">
@@ -41,11 +50,9 @@ export function PackageDetail({ pkg, loading, llmConfig, apiKey, onOpenSettings 
   const tap = typeof pkg.tap === "string" ? pkg.tap : null;
   const license = formatLicense(pkg.license);
 
-  const installedVersion =
-    typeof pkg.installedVersion === "string" ? pkg.installedVersion : null;
-  const latestVersion =
-    typeof pkg.latestVersion === "string" ? pkg.latestVersion : null;
-  const isOutdated = pkg.isOutdated === true;
+  const installedVersion = getInstalledVersionString(pkg);
+  const latestVersion = getLatestVersionString(pkg);
+  const isOutdated = isPackageOutdated(pkg);
 
   return (
     <aside className="package-detail">
@@ -74,20 +81,7 @@ export function PackageDetail({ pkg, loading, llmConfig, apiKey, onOpenSettings 
         <pre>{JSON.stringify(pkg, null, 2)}</pre>
       </details>
 
-      <AISection
-        pkg={pkg}
-        llmConfig={llmConfig}
-        apiKey={apiKey}
-        onOpenSettings={onOpenSettings}
-      />
+      <AISection pkg={pkg} llmConfig={llmConfig} apiKey={apiKey} onOpenSettings={onOpenSettings} />
     </aside>
   );
-}
-
-function formatLicense(license: unknown): string | null {
-  if (typeof license === "string") return license;
-  if (Array.isArray(license)) {
-    return license.map(String).join(", ");
-  }
-  return null;
 }

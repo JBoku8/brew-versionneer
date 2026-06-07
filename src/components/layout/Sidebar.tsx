@@ -1,29 +1,18 @@
-import { BrewStatus, TabId } from "../api/tauri";
+import { TabId } from "../../api/tauri";
+import { TAB_ITEMS } from "../../constants/tabs";
+import { getBrewVersionLine } from "../../lib/brew";
+import { AppView, BrewShellProps } from "../../models/ui";
 import "./Sidebar.css";
 
-interface SidebarProps {
+interface SidebarProps extends Pick<BrewShellProps, "brewStatus"> {
   collapsed: boolean;
   onToggle: () => void;
   activeTab: TabId;
   onTabChange: (tab: TabId) => void;
-  activeView: "packages" | "settings";
-  onViewChange: (view: "packages" | "settings") => void;
-  brewStatus: BrewStatus | null;
+  activeView: AppView;
+  onViewChange: (view: AppView) => void;
   brewPending: boolean;
 }
-
-interface TabNavItem {
-  id: TabId;
-  label: string;
-  icon: string;
-  requiresBrew?: boolean;
-}
-
-const TAB_ITEMS: TabNavItem[] = [
-  { id: "installed", label: "Installed", icon: "↓", requiresBrew: true },
-  { id: "formulae", label: "Formulae", icon: "⌘" },
-  { id: "casks", label: "Casks", icon: "⬜" },
-];
 
 export function Sidebar({
   collapsed,
@@ -36,13 +25,15 @@ export function Sidebar({
   brewPending,
 }: SidebarProps) {
   const brewInstalled = brewStatus?.installed ?? false;
-  const brewLine = brewStatus?.version?.split("\n")[0] ?? null;
+  const brewLine = getBrewVersionLine(brewStatus);
 
   return (
     <aside className={collapsed ? "sidebar collapsed" : "sidebar"} aria-label="Navigation">
       {/* App logo */}
       <div className="sidebar-logo">
-        <span className="sidebar-logo-icon" aria-hidden="true">♦</span>
+        <span className="sidebar-logo-icon" aria-hidden="true">
+          ♦
+        </span>
         {!collapsed && <span className="sidebar-logo-text">Brew Versionneer</span>}
       </div>
 
@@ -62,11 +53,7 @@ export function Sidebar({
             <button
               key={item.id}
               type="button"
-              className={[
-                "sidebar-item",
-                isActive ? "active" : "",
-                disabled ? "disabled" : "",
-              ]
+              className={["sidebar-item", isActive ? "active" : "", disabled ? "disabled" : ""]
                 .filter(Boolean)
                 .join(" ")}
               onClick={() => !disabled && onTabChange(item.id)}
@@ -74,7 +61,9 @@ export function Sidebar({
               title={tooltip}
               aria-current={isActive ? "page" : undefined}
             >
-              <span className="sidebar-icon" aria-hidden="true">{item.icon}</span>
+              <span className="sidebar-icon" aria-hidden="true">
+                {item.icon}
+              </span>
               {!collapsed && <span className="sidebar-label">{item.label}</span>}
             </button>
           );
@@ -88,25 +77,30 @@ export function Sidebar({
       <div className="sidebar-settings-nav">
         <button
           type="button"
-          className={["sidebar-item", activeView === "settings" ? "active" : ""].filter(Boolean).join(" ")}
+          className={["sidebar-item", activeView === "settings" ? "active" : ""]
+            .filter(Boolean)
+            .join(" ")}
           onClick={() => onViewChange("settings")}
           title={collapsed ? "Settings" : undefined}
           aria-current={activeView === "settings" ? "page" : undefined}
         >
-          <span className="sidebar-icon" aria-hidden="true">⚙</span>
+          <span className="sidebar-icon" aria-hidden="true">
+            ⚙
+          </span>
           {!collapsed && <span className="sidebar-label">Settings</span>}
         </button>
       </div>
 
       {/* Footer: brew version + collapse toggle */}
       <div className="sidebar-footer">
-        {!collapsed && (brewPending ? (
-          <span className="sidebar-brew-version sidebar-brew-checking">Checking…</span>
-        ) : brewLine ? (
-          <span className="sidebar-brew-version" title={brewStatus?.version ?? undefined}>
-            {brewLine}
-          </span>
-        ) : null)}
+        {!collapsed &&
+          (brewPending ? (
+            <span className="sidebar-brew-version sidebar-brew-checking">Checking…</span>
+          ) : brewLine ? (
+            <span className="sidebar-brew-version" title={brewStatus?.version ?? undefined}>
+              {brewLine}
+            </span>
+          ) : null)}
         <button
           type="button"
           className="sidebar-toggle"

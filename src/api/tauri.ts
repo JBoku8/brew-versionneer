@@ -39,26 +39,16 @@ export function getInstalledFormulae(): Promise<PackageRecord[]> {
   return invoke<unknown>("get_installed_formulae").then(normalizePackageList);
 }
 
-export function fetchFormulaeCatalog(
-  forceRefresh = false,
-): Promise<PackageRecord[]> {
-  return invoke<unknown>("fetch_formulae_catalog", { forceRefresh }).then(
-    normalizePackageList,
-  );
+export function fetchFormulaeCatalog(forceRefresh = false): Promise<PackageRecord[]> {
+  return invoke<unknown>("fetch_formulae_catalog", { forceRefresh }).then(normalizePackageList);
 }
 
-export function fetchCasksCatalog(
-  forceRefresh = false,
-): Promise<PackageRecord[]> {
-  return invoke<unknown>("fetch_casks_catalog", { forceRefresh }).then(
-    normalizePackageList,
-  );
+export function fetchCasksCatalog(forceRefresh = false): Promise<PackageRecord[]> {
+  return invoke<unknown>("fetch_casks_catalog", { forceRefresh }).then(normalizePackageList);
 }
 
 export function fetchFormulaDetail(name: string): Promise<PackageRecord[]> {
-  return invoke<unknown>("fetch_formula_detail", { name }).then(
-    normalizePackageList,
-  );
+  return invoke<unknown>("fetch_formula_detail", { name }).then(normalizePackageList);
 }
 
 /** Returns a {name: installedVersion} map (~100ms, much faster than getInstalledFormulae). */

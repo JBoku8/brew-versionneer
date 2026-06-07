@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { LLMConfig } from "../api/config";
 import {
-  BrewStatus,
   OutdatedResult,
   TabId,
   getInstalledFormulae,
@@ -9,24 +7,26 @@ import {
   getOutdatedFormulae,
   packageName,
   packageVersion,
-} from "../api/tauri";
-import { PackageList } from "./PackageList";
+} from "../../api/tauri";
+import { EMPTY_OUTDATED } from "../../constants/brew";
+import { deriveBrewState } from "../../lib/brew";
+import { BrewShellProps, LlmContextProps } from "../../models/ui";
+import { PackageList } from "../packages";
 import "./AppLayout.css";
 
-interface AppLayoutProps {
-  brewStatus: BrewStatus | null;
-  brewChecking: boolean;
+interface AppLayoutProps extends BrewShellProps, LlmContextProps {
   activeTab: TabId;
-  llmConfig: LLMConfig | null;
-  apiKey: string | null;
-  onOpenSettings: () => void;
 }
 
-const EMPTY_OUTDATED: OutdatedResult = { formulae: [], casks: [] };
-
-export function AppLayout({ brewStatus, brewChecking, activeTab, llmConfig, apiKey, onOpenSettings }: AppLayoutProps) {
-  const brewInstalled = brewStatus?.installed ?? false;
-  const brewPending = brewChecking && brewStatus === null;
+export function AppLayout({
+  brewStatus,
+  brewChecking,
+  activeTab,
+  llmConfig,
+  apiKey,
+  onOpenSettings,
+}: AppLayoutProps) {
+  const { brewInstalled, brewPending } = deriveBrewState(brewStatus, brewChecking);
 
   const [installedVersions, setInstalledVersions] = useState<Record<string, string>>({});
   const [outdatedResult, setOutdatedResult] = useState<OutdatedResult>(EMPTY_OUTDATED);

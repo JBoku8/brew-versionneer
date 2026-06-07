@@ -5,21 +5,18 @@ import {
   KEYCHAIN_ACCOUNT,
   KEYCHAIN_SERVICE,
   deleteKeychain,
-  readConfig,
-  readKeychain,
   writeConfig,
   writeKeychain,
-} from "../api/config";
+} from "../../api/config";
+import { MODEL_SUGGESTIONS, TTL_OPTIONS } from "../../constants/settings";
+import { loadAppConfig } from "../../lib/config";
+import { testLlmConnection } from "../../lib/llm";
+import { ConnectionStatus } from "../../models/ui";
 import "./SettingsView.css";
-
-const MODEL_SUGGESTIONS = ["gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo", "llama3", "claude-3-5-haiku-20241022"];
-const TTL_OPTIONS = [6, 12, 24, 72, 168]; // hours
 
 interface SettingsViewProps {
   onConfigSaved?: (config: AppConfig, apiKey: string | null) => void;
 }
-
-type ConnectionStatus = "idle" | "testing" | "ok" | "error";
 
 export function SettingsView({ onConfigSaved }: SettingsViewProps) {
   // Form state
@@ -38,24 +35,15 @@ export function SettingsView({ onConfigSaved }: SettingsViewProps) {
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load config and check for existing API key on mount
   useEffect(() => {
     async function load() {
       setLoading(true);
       try {
-        const [cfg, existingKey] = await Promise.allSettled([
-          readConfig(),
-          readKeychain(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT),
-        ]);
-
-        if (cfg.status === "fulfilled") {
-          setEndpoint(cfg.value.llm.endpoint);
-          setModel(cfg.value.llm.model);
-          setTtlHours(cfg.value.cache.ttl_hours);
-        }
-        if (existingKey.status === "fulfilled" && existingKey.value) {
-          setKeyExists(true);
-        }
+        const { config, hasApiKey } = await loadAppConfig();
+        setEndpoint(config.llm.endpoint);
+        setModel(config.llm.model);
+        setTtlHours(config.cache.ttl_hours);
+        setKeyExists(hasApiKey);
       } finally {
         setLoading(false);
       }
@@ -106,41 +94,13 @@ export function SettingsView({ onConfigSaved }: SettingsViewProps) {
   const handleTestConnection = async () => {
     setConnectionStatus("testing");
     setConnectionError(null);
-    const url = endpoint.trim().replace(/\/$/, "") + "/chat/completions";
     const key = editingKey && apiKey.trim() ? apiKey.trim() : "";
-    try {
-      const resp = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(key ? { Authorization: `Bearer ${key}` } : {}),
-        },
-        body: JSON.stringify({
-          model: model.trim() || "gpt-4o-mini",
-          messages: [{ role: "user", content: "ping" }],
-          max_tokens: 1,
-        }),
-        signal: AbortSignal.timeout(10_000),
-      });
-      if (resp.ok || resp.status === 400) {
-        // 400 from OpenAI means we connected but request was invalid — still means endpoint is reachable
-        setConnectionStatus("ok");
-      } else if (resp.status === 401) {
-        setConnectionStatus("error");
-        setConnectionError("Authentication failed — check your API key.");
-      } else {
-        setConnectionStatus("error");
-        setConnectionError(`HTTP ${resp.status}`);
-      }
-    } catch (err) {
+    const result = await testLlmConnection({ endpoint, model }, key);
+    if (result.ok) {
+      setConnectionStatus("ok");
+    } else {
       setConnectionStatus("error");
-      setConnectionError(
-        err instanceof DOMException && err.name === "TimeoutError"
-          ? "Request timed out (10 s)"
-          : err instanceof Error
-            ? err.message
-            : "Network error",
-      );
+      setConnectionError(result.error ?? "Connection failed");
     }
   };
 
@@ -184,11 +144,7 @@ export function SettingsView({ onConfigSaved }: SettingsViewProps) {
         {keyExists && !editingKey ? (
           <div className="settings-key-row">
             <span className="settings-key-masked">●●●●●●●●●●●●●●●●</span>
-            <button
-              type="button"
-              className="settings-link-btn"
-              onClick={() => setEditingKey(true)}
-            >
+            <button type="button" className="settings-link-btn" onClick={() => setEditingKey(true)}>
               Update key
             </button>
           </div>
@@ -232,9 +188,7 @@ export function SettingsView({ onConfigSaved }: SettingsViewProps) {
           >
             {connectionStatus === "testing" ? "Testing…" : "Test connection"}
           </button>
-          {connectionStatus === "ok" && (
-            <span className="settings-connection-ok">✓ Connected</span>
-          )}
+          {connectionStatus === "ok" && <span className="settings-connection-ok">✓ Connected</span>}
           {connectionStatus === "error" && (
             <span className="settings-connection-error">✗ {connectionError}</span>
           )}

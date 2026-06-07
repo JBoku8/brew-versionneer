@@ -1,68 +1,25 @@
 import { useEffect, useState } from "react";
-import {
-  AppConfig,
-  KEYCHAIN_ACCOUNT,
-  KEYCHAIN_SERVICE,
-  LLMConfig,
-  readConfig,
-  readKeychain,
-} from "../api/config";
-import { BrewStatus, TabId } from "../api/tauri";
+import { AppConfig } from "../../api/config";
+import { TabId } from "../../api/tauri";
+import { SIDEBAR_COLLAPSED_KEY } from "../../constants/storageKeys";
+import { useAppConfig } from "../../hooks/useAppConfig";
+import { deriveBrewState } from "../../lib/brew";
+import { readStorageBoolean, writeStorageBoolean } from "../../lib/storage";
+import { AppView, BrewShellProps } from "../../models/ui";
+import { SettingsView } from "../settings";
 import { AppLayout } from "./AppLayout";
-import { SettingsView } from "./SettingsView";
 import { Sidebar } from "./Sidebar";
 import "./AppShell.css";
 
-interface AppShellProps {
-  brewStatus: BrewStatus | null;
-  brewChecking: boolean;
-}
+export function AppShell({ brewStatus, brewChecking }: BrewShellProps) {
+  const { brewInstalled, brewPending } = deriveBrewState(brewStatus, brewChecking);
 
-function readCollapsed(): boolean {
-  try {
-    return localStorage.getItem("sidebar-collapsed") === "true";
-  } catch {
-    return false;
-  }
-}
-
-function writeCollapsed(value: boolean) {
-  try {
-    localStorage.setItem("sidebar-collapsed", String(value));
-  } catch {
-    // localStorage unavailable in some sandboxed environments
-  }
-}
-
-export function AppShell({ brewStatus, brewChecking }: AppShellProps) {
-  const brewInstalled = brewStatus?.installed ?? false;
-  const brewPending = brewChecking && brewStatus === null;
-
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(readCollapsed);
-  const [activeView, setActiveView] = useState<"packages" | "settings">("packages");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
+    readStorageBoolean(SIDEBAR_COLLAPSED_KEY),
+  );
+  const [activeView, setActiveView] = useState<AppView>("packages");
   const [activeTab, setActiveTab] = useState<TabId>("formulae");
-
-  // LLM config lifted here so both SettingsView (write) and PackageDetail (read) can access it
-  const [llmConfig, setLlmConfig] = useState<LLMConfig | null>(null);
-  const [apiKey, setApiKey] = useState<string | null>(null);
-
-  // Load config + API key on mount
-  useEffect(() => {
-    async function load() {
-      const [cfgResult, keyResult] = await Promise.allSettled([
-        readConfig(),
-        readKeychain(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT),
-      ]);
-      if (cfgResult.status === "fulfilled") {
-        const { llm } = cfgResult.value;
-        if (llm.endpoint) setLlmConfig(llm);
-      }
-      if (keyResult.status === "fulfilled") {
-        setApiKey(keyResult.value);
-      }
-    }
-    void load();
-  }, []);
+  const { llmConfig, setLlmConfig, apiKey, setApiKey } = useAppConfig();
 
   // Once brew is confirmed installed, switch from the formulae default to the installed tab.
   useEffect(() => {
@@ -74,7 +31,7 @@ export function AppShell({ brewStatus, brewChecking }: AppShellProps) {
   const handleToggleSidebar = () => {
     setSidebarCollapsed((prev) => {
       const next = !prev;
-      writeCollapsed(next);
+      writeStorageBoolean(SIDEBAR_COLLAPSED_KEY, next);
       return next;
     });
   };

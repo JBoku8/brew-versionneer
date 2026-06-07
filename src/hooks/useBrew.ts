@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { BrewStatus, detectBrew, getBrewVersion } from "../api/tauri";
+import { getErrorMessage } from "../lib/errors";
 
 export function useBrew() {
   const [status, setStatus] = useState<BrewStatus | null>(null);
@@ -17,16 +18,14 @@ export function useBrew() {
         try {
           const version = await getBrewVersion();
           if (version) {
-            setStatus((prev) =>
-              prev ? { ...prev, version } : { ...detected, version },
-            );
+            setStatus((prev) => (prev ? { ...prev, version } : { ...detected, version }));
           }
         } catch {
           // Version is optional; shell is already usable.
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(getErrorMessage(err));
       setStatus({ installed: false, path: null, version: null });
     } finally {
       setChecking(false);

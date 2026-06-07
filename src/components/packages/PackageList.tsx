@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LLMConfig } from "../api/config";
 import {
   OutdatedResult,
   PackageRecord,
@@ -9,23 +8,32 @@ import {
   fetchFormulaeCatalog,
   packageDescription,
   packageName,
-} from "../api/tauri";
+} from "../../api/tauri";
+import { DETAIL_MIN_WIDTH, LIST_MIN_WIDTH, PAGE_SIZE } from "../../constants/layout";
+import { getTabLabel } from "../../constants/tabs";
+import { usePanelResize } from "../../hooks/usePanelResize";
+import { getErrorMessage } from "../../lib/errors";
+import {
+  annotatePackages,
+  buildInstalledPackageList,
+  countOutdatedPackages,
+  filterPackages,
+  getInstalledVersionString,
+  getLatestVersionString,
+  isPackageOutdated,
+} from "../../lib/package";
+import { LlmContextProps } from "../../models/ui";
 import { PackageDetail } from "./PackageDetail";
 import "./PackageList.css";
 
-interface PackageListProps {
+interface PackageListProps extends LlmContextProps {
   activeTab: TabId;
   brewInstalled: boolean;
   installedVersions: Record<string, string>;
   outdatedResult: OutdatedResult;
   installedReady: boolean;
   onRefreshInstalled: () => void;
-  llmConfig: LLMConfig | null;
-  apiKey: string | null;
-  onOpenSettings: () => void;
 }
-
-const PAGE_SIZE = 100;
 
 export function PackageList({
   activeTab,
@@ -46,6 +54,7 @@ export function PackageList({
   const [search, setSearch] = useState("");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [showOutdatedOnly, setShowOutdatedOnly] = useState(false);
+  const { panelsRef, detailWidth, isResizing, handleResizeStart } = usePanelResize();
   // In-memory cache for remote catalog tabs — avoids re-fetching on tab switch
   const dataCache = useRef<Partial<Record<TabId, PackageRecord[]>>>({});
 
@@ -64,19 +73,7 @@ export function PackageList({
           setPackages([]);
           return;
         }
-        const outdatedMap = new Map(outdatedResult.formulae.map((e) => [e.name, e]));
-        const pkgs: PackageRecord[] = Object.entries(installedVersions)
-          .sort(([a], [b]) => a.localeCompare(b))
-          .map(([name, version]): PackageRecord => {
-            const entry = outdatedMap.get(name);
-            return {
-              name,
-              installedVersion: version,
-              isOutdated: !!entry,
-              latestVersion: entry?.current_version ?? version,
-            };
-          });
-        setPackages(pkgs);
+        setPackages(buildInstalledPackageList(installedVersions));
         setLoading(false);
         setError(null);
         setVisibleCount(PAGE_SIZE);
@@ -102,13 +99,13 @@ export function PackageList({
         setPackages(data);
         setVisibleCount(PAGE_SIZE);
       } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
+        setError(getErrorMessage(err));
         setPackages([]);
       } finally {
         setLoading(false);
       }
     },
-    [activeTab, brewInstalled, installedVersions, outdatedResult, installedReady],
+    [activeTab, brewInstalled, installedVersions, installedReady],
   );
 
   // Reset per-tab UI state on tab switch
@@ -123,49 +120,19 @@ export function PackageList({
     void loadPackages();
   }, [loadPackages]);
 
-  // Annotate catalog entries with installed/outdated status derived from AppLayout props.
-  // Runs as a memo so it stays fresh whenever installedVersions or outdatedResult change,
-  // without needing to invalidate the raw catalog cache.
-  const annotated = useMemo(() => {
-    if (activeTab === "installed") return packages;
-    const outdatedSet = new Set(outdatedResult.formulae.map((e) => e.name));
-    return packages.map((pkg) => {
-      const name = packageName(pkg);
-      const version = installedVersions[name];
-      if (version !== undefined) {
-        return {
-          ...pkg,
-          isInstalled: true,
-          installedVersion: version,
-          isOutdated: outdatedSet.has(name),
-          latestVersion: outdatedSet.has(name)
-            ? (outdatedResult.formulae.find((e) => e.name === name)?.current_version ?? version)
-            : version,
-        };
-      }
-      return pkg;
-    });
-  }, [packages, installedVersions, outdatedResult, activeTab]);
+  const annotated = useMemo(
+    () => annotatePackages(packages, installedVersions, outdatedResult, activeTab),
+    [packages, installedVersions, outdatedResult, activeTab],
+  );
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return annotated.filter((pkg) => {
-      if (packageName(pkg) === "unknown") return false;
-      if (showOutdatedOnly && !pkg.isOutdated) return false;
-      if (!q) return true;
-      const name = packageName(pkg).toLowerCase();
-      const desc = packageDescription(pkg).toLowerCase();
-      return name.includes(q) || desc.includes(q);
-    });
-  }, [annotated, search, showOutdatedOnly]);
+  const filtered = useMemo(
+    () => filterPackages(annotated, search, showOutdatedOnly),
+    [annotated, search, showOutdatedOnly],
+  );
 
   const visible = filtered.slice(0, visibleCount);
   const canLoadMore = visibleCount < filtered.length;
-
-  const outdatedCount = useMemo(
-    () => annotated.filter((p) => p.isOutdated).length,
-    [annotated],
-  );
+  const outdatedCount = useMemo(() => countOutdatedPackages(annotated), [annotated]);
 
   const handleSelect = async (pkg: PackageRecord) => {
     setSelected(pkg);
@@ -192,12 +159,7 @@ export function PackageList({
     }
   };
 
-  const tabLabel =
-    activeTab === "installed"
-      ? "Installed"
-      : activeTab === "formulae"
-        ? "Formulae"
-        : "Casks";
+  const tabLabel = getTabLabel(activeTab);
 
   const countLabel = loading
     ? "Loading…"
@@ -259,68 +221,79 @@ export function PackageList({
 
       {error && <div className="browser-error">{error}</div>}
 
-      <div className="browser-panels">
-        <ul className="package-list" role="listbox" aria-label={`${tabLabel} packages`}>
-          {loading && packages.length === 0 && (
-            <li className="list-placeholder">Loading packages…</li>
+      <div className="browser-panels" ref={panelsRef}>
+        <div className="list-column" style={{ minWidth: LIST_MIN_WIDTH }}>
+          {canLoadMore && (
+            <button
+              type="button"
+              className="load-more"
+              onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
+            >
+              Load more ({filtered.length - visibleCount} remaining)
+            </button>
           )}
-          {!loading && visible.length === 0 && (
-            <li className="list-placeholder">No packages match your search.</li>
-          )}
-          {visible.map((pkg) => {
-            const name = packageName(pkg);
-            const desc = packageDescription(pkg);
-            const isSelected = selected !== null && packageName(selected) === name;
-            const isOutdated = pkg.isOutdated === true;
-            const isInstalled = activeTab === "installed" || pkg.isInstalled === true;
-            return (
-              <li key={name}>
-                <button
-                  type="button"
-                  className={isSelected ? "list-item selected" : "list-item"}
-                  onClick={() => void handleSelect(pkg)}
-                  role="option"
-                  aria-selected={isSelected}
-                >
-                  <div className="list-item-header">
-                    <span className="list-item-name">{name}</span>
-                    <div className="list-item-badges">
-                      {isOutdated && typeof pkg.installedVersion === "string" && (
-                        <span className="badge outdated">
-                          {pkg.installedVersion as string} → {typeof pkg.latestVersion === "string" ? pkg.latestVersion as string : "?"}
-                        </span>
-                      )}
-                      {isInstalled && !isOutdated && typeof pkg.installedVersion === "string" && (
-                        <span className="badge uptodate">
-                          {pkg.installedVersion as string}
-                        </span>
-                      )}
+          <ul className="package-list" role="listbox" aria-label={`${tabLabel} packages`}>
+            {loading && packages.length === 0 && (
+              <li className="list-placeholder">Loading packages…</li>
+            )}
+            {!loading && visible.length === 0 && (
+              <li className="list-placeholder">No packages match your search.</li>
+            )}
+            {visible.map((pkg) => {
+              const name = packageName(pkg);
+              const desc = packageDescription(pkg);
+              const isSelected = selected !== null && packageName(selected) === name;
+              const isOutdated = isPackageOutdated(pkg);
+              const installedVersion = getInstalledVersionString(pkg);
+              const latestVersion = getLatestVersionString(pkg);
+              const isInstalled = activeTab === "installed" || pkg.isInstalled === true;
+              return (
+                <li key={name}>
+                  <button
+                    type="button"
+                    className={isSelected ? "list-item selected" : "list-item"}
+                    onClick={() => void handleSelect(pkg)}
+                    role="option"
+                    aria-selected={isSelected}
+                  >
+                    <div className="list-item-header">
+                      <span className="list-item-name">{name}</span>
+                      <div className="list-item-badges">
+                        {isOutdated && installedVersion && (
+                          <span className="badge outdated">
+                            {installedVersion} → {latestVersion ?? "?"}
+                          </span>
+                        )}
+                        {isInstalled && !isOutdated && installedVersion && (
+                          <span className="badge uptodate">{installedVersion}</span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  {desc && <span className="list-item-desc">{desc}</span>}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+                    {desc && <span className="list-item-desc">{desc}</span>}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
 
-        {canLoadMore && (
-          <button
-            type="button"
-            className="load-more"
-            onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
-          >
-            Load more ({filtered.length - visibleCount} remaining)
-          </button>
-        )}
-
-        <PackageDetail
-          pkg={selected}
-          loading={detailLoading}
-          llmConfig={llmConfig}
-          apiKey={apiKey}
-          onOpenSettings={onOpenSettings}
+        <div
+          className={isResizing ? "column-resize-handle active" : "column-resize-handle"}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize list and detail panels"
+          onMouseDown={handleResizeStart}
         />
+
+        <div className="detail-column" style={{ width: detailWidth, minWidth: DETAIL_MIN_WIDTH }}>
+          <PackageDetail
+            pkg={selected}
+            loading={detailLoading}
+            llmConfig={llmConfig}
+            apiKey={apiKey}
+            onOpenSettings={onOpenSettings}
+          />
+        </div>
       </div>
     </div>
   );

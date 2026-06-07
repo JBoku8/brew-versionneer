@@ -1,9 +1,8 @@
 .package-detail {
   flex: 1;
-  min-width: 280px;
-  max-width: 420px;
+  width: 100%;
+  min-width: 0;
   padding: 1rem 1.25rem;
-  border-left: 1px solid #ddd;
   overflow-y: auto;
   text-align: left;
 }
@@ -54,10 +53,6 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  .package-detail {
-    border-left-color: #444;
-  }
-
   .detail-version,
   .detail-meta {
     color: #aaa;

@@ -1,6 +1,6 @@
 import { useBrew } from "./hooks/useBrew";
-import { AppShell } from "./components/AppShell";
-import { InstallBrew } from "./components/InstallBrew";
+import { AppShell } from "./components/layout";
+import { InstallBrew } from "./components/brew";
 import "./App.css";
 
 function App() {
