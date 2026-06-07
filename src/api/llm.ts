@@ -82,11 +82,10 @@ export async function askAboutPackage(
   });
 
   if (!response.ok) {
-    const body = await response.text().catch(() => "");
     if (response.status === 401) {
       throw new Error("Authentication failed — check your API key in Settings.");
     }
-    throw new Error(`API error ${response.status}: ${body.slice(0, 200)}`);
+    throw new Error(`API error ${response.status} — check your endpoint and model in Settings.`);
   }
 
   const data = (await response.json()) as {

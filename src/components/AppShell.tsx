@@ -86,7 +86,8 @@ export function AppShell({ brewStatus, brewChecking }: AppShellProps) {
 
   const handleConfigSaved = (config: AppConfig, newKey: string | null) => {
     setLlmConfig(config.llm.endpoint ? config.llm : null);
-    if (newKey !== null) setApiKey(newKey);
+    // null = no key change; "" = key deleted (Keychain cleared); non-empty = new key
+    if (newKey !== null) setApiKey(newKey || null);
   };
 
   return (

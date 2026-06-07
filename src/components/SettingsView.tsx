@@ -86,7 +86,10 @@ export function SettingsView({ onConfigSaved }: SettingsViewProps) {
         setEditingKey(false);
       }
 
-      const finalKey = editingKey && apiKey.trim() ? apiKey.trim() : null;
+      // null  = key unchanged (don't touch AppShell state)
+      // ""    = key explicitly deleted
+      // str   = new key value just written to Keychain
+      const finalKey = editingKey ? apiKey.trim() : null;
       onConfigSaved?.(config, finalKey);
 
       setSaved(true);
