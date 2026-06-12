@@ -5,11 +5,12 @@ import {
   KEYCHAIN_ACCOUNT,
   KEYCHAIN_SERVICE,
   deleteKeychain,
+  readKeychain,
   writeConfig,
   writeKeychain,
 } from "../../api/config";
 import { useTheme } from "../../contexts/ThemeContext";
-import { MODEL_SUGGESTIONS, TTL_OPTIONS } from "../../constants/settings";
+import { ENDPOINT_PRESETS, MODEL_SUGGESTIONS, TTL_OPTIONS } from "../../constants/settings";
 import { loadAppConfig } from "../../lib/config";
 import { testLlmConnection } from "../../lib/llm";
 import { ThemePreference } from "../../lib/theme";
@@ -103,7 +104,15 @@ export function SettingsView({ onConfigSaved }: SettingsViewProps) {
   const handleTestConnection = async () => {
     setConnectionStatus("testing");
     setConnectionError(null);
-    const key = editingKey && apiKey.trim() ? apiKey.trim() : "";
+    // Use the key being typed; otherwise fall back to the one stored in the Keychain.
+    let key = editingKey && apiKey.trim() ? apiKey.trim() : "";
+    if (!key && keyExists) {
+      try {
+        key = (await readKeychain(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT)) ?? "";
+      } catch {
+        // Keychain unavailable — test without a key.
+      }
+    }
     const result = await testLlmConnection({ endpoint, model }, key);
     if (result.ok) {
       setConnectionStatus("ok");
@@ -166,6 +175,27 @@ export function SettingsView({ onConfigSaved }: SettingsViewProps) {
           placeholder="https://api.openai.com/v1"
           spellCheck={false}
         />
+        <div className="settings-presets">
+          {(["local", "remote"] as const).map((group) => (
+            <div key={group} className="settings-preset-group">
+              <span className="settings-preset-label">{group === "local" ? "Local" : "Remote"}</span>
+              {ENDPOINT_PRESETS[group].map((p) => (
+                <button
+                  key={p.label}
+                  type="button"
+                  className={`settings-preset-chip${endpoint === p.url ? " active" : ""}`}
+                  title={p.url}
+                  onClick={() => {
+                    setEndpoint(p.url);
+                    if (p.model) setModel(p.model);
+                  }}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
 
         <label className="settings-label" htmlFor="api-key">
           API Key

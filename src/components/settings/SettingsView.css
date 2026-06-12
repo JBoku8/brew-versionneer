@@ -155,6 +155,55 @@
   border-color: transparent;
 }
 
+/* ── Endpoint presets ─────────────────────────────── */
+
+.settings-presets {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.settings-preset-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.settings-preset-label {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-faint);
+  width: 3.5rem;
+  flex-shrink: 0;
+}
+
+.settings-preset-chip {
+  font-size: 0.72rem;
+  padding: 0.2em 0.65em;
+  border-radius: 4px;
+  background: var(--bg-code);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  cursor: pointer;
+  box-shadow: none;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+  white-space: nowrap;
+}
+
+.settings-preset-chip:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.settings-preset-chip.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: transparent;
+}
+
 /* ── Connection test ──────────────────────────────── */
 
 .settings-actions {
