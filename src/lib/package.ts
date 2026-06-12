@@ -26,6 +26,28 @@ export function isPackageOutdated(pkg: PackageRecord): boolean {
   return pkg.isOutdated === true;
 }
 
+export interface DeprecationInfo {
+  label: "deprecated" | "disabled";
+  reason: string | null;
+}
+
+/** Deprecation/disable status from the brew catalog. Disabled wins over deprecated. */
+export function getDeprecationInfo(pkg: PackageRecord): DeprecationInfo | null {
+  if (pkg.disabled === true) {
+    return {
+      label: "disabled",
+      reason: typeof pkg.disable_reason === "string" ? pkg.disable_reason : null,
+    };
+  }
+  if (pkg.deprecated === true) {
+    return {
+      label: "deprecated",
+      reason: typeof pkg.deprecation_reason === "string" ? pkg.deprecation_reason : null,
+    };
+  }
+  return null;
+}
+
 export function buildInstalledPackageList(
   installedVersions: Record<string, string>,
 ): PackageRecord[] {

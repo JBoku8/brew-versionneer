@@ -1,7 +1,7 @@
 import { LLMConfig } from "../api/config";
 import { BrewStatus, TabId } from "../api/tauri";
 
-export type AppView = "packages" | "settings";
+export type AppView = "packages" | "assistant" | "settings";
 
 export type ConnectionStatus = "idle" | "testing" | "ok" | "error";
 

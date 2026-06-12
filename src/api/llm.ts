@@ -2,6 +2,7 @@ import { LLMConfig } from "./config";
 import { buildChatCompletionsUrl } from "../lib/llm";
 import { getInstalledVersionString, getLatestVersionString } from "../lib/package";
 import {
+  OutdatedResult,
   PackageRecord,
   packageDescription,
   packageHomepage,
@@ -42,9 +43,10 @@ function buildContext(pkg: PackageRecord): string {
 }
 
 /**
- * Send a question about `pkg` to an OpenAI-compatible endpoint.
- * `history` is the existing chat thread (user + assistant turns).
- * Returns the assistant's reply text.
+ * Send a question about `pkg` to an OpenAI-compatible endpoint, streaming the
+ * reply. `history` is the existing chat thread (user + assistant turns).
+ * `onDelta` receives the accumulated reply text as tokens arrive.
+ * Returns the full assistant reply.
  */
 export async function askAboutPackage(
   config: LLMConfig,
@@ -52,24 +54,83 @@ export async function askAboutPackage(
   pkg: PackageRecord,
   history: ChatMessage[],
   question: string,
+  onDelta?: (text: string) => void,
+): Promise<string> {
+  // Package context lives in the system message — sent once, not per turn.
+  const messages: Array<{ role: string; content: string }> = [
+    { role: "system", content: `${SYSTEM_PROMPT}\n\n${buildContext(pkg)}` },
+    ...history,
+    { role: "user", content: question },
+  ];
+  return chatCompletion(config, apiKey, messages, onDelta);
+}
+
+const SETUP_SYSTEM_PROMPT =
+  "You are a Homebrew expert helping the user manage their installed packages. " +
+  "Use the provided inventory to answer questions about upgrades, cleanup, redundancy, " +
+  "and tool recommendations. Be concise and practical. " +
+  "If asked about a package not in the inventory, say it is not installed.";
+
+const SETUP_CONTEXT_MAX_ENTRIES = 300;
+
+/** Build a context block describing the user's whole Homebrew installation. */
+function buildSetupContext(
+  installedVersions: Record<string, string>,
+  outdatedResult: OutdatedResult,
+): string {
+  const entries = Object.entries(installedVersions).sort(([a], [b]) => a.localeCompare(b));
+  const listed = entries
+    .slice(0, SETUP_CONTEXT_MAX_ENTRIES)
+    .map(([name, version]) => `${name} ${version}`)
+    .join("\n");
+  const more =
+    entries.length > SETUP_CONTEXT_MAX_ENTRIES
+      ? `\n(and ${entries.length - SETUP_CONTEXT_MAX_ENTRIES} more)`
+      : "";
+  const outdated =
+    outdatedResult.formulae
+      .map(
+        (e) =>
+          `${e.name} ${e.installed_versions.join(", ")} -> ${e.current_version}` +
+          (e.pinned ? " (pinned)" : ""),
+      )
+      .join("\n") || "none";
+
+  return `Installed formulae (${entries.length}):\n${listed}${more}\n\nOutdated:\n${outdated}`;
+}
+
+/**
+ * Ask a question about the user's whole Homebrew setup (installed + outdated
+ * packages are provided as context). Streams via `onDelta` like askAboutPackage.
+ */
+export async function askAboutSetup(
+  config: LLMConfig,
+  apiKey: string,
+  installedVersions: Record<string, string>,
+  outdatedResult: OutdatedResult,
+  history: ChatMessage[],
+  question: string,
+  onDelta?: (text: string) => void,
+): Promise<string> {
+  const messages: Array<{ role: string; content: string }> = [
+    {
+      role: "system",
+      content: `${SETUP_SYSTEM_PROMPT}\n\n${buildSetupContext(installedVersions, outdatedResult)}`,
+    },
+    ...history,
+    { role: "user", content: question },
+  ];
+  return chatCompletion(config, apiKey, messages, onDelta);
+}
+
+/** Shared OpenAI-compatible chat-completions call with streaming + JSON fallback. */
+async function chatCompletion(
+  config: LLMConfig,
+  apiKey: string,
+  messages: Array<{ role: string; content: string }>,
+  onDelta?: (text: string) => void,
 ): Promise<string> {
   const url = buildChatCompletionsUrl(config.endpoint);
-
-  const context = buildContext(pkg);
-  const userContent = `${context}\n\nQuestion: ${question}`;
-
-  const messages: Array<{ role: string; content: string }> = [
-    { role: "system", content: SYSTEM_PROMPT },
-    // Inject prior turns, replacing the first user turn's content with context + question
-    ...history.flatMap((msg, i) => {
-      if (i === 0 && msg.role === "user") {
-        // First user turn already includes context from when it was sent; keep as-is
-        return [msg];
-      }
-      return [msg];
-    }),
-    { role: "user", content: userContent },
-  ];
 
   const response = await fetch(url, {
     method: "POST",
@@ -80,10 +141,10 @@ export async function askAboutPackage(
     body: JSON.stringify({
       model: config.model,
       messages,
-      stream: false,
-      max_tokens: 512,
+      stream: true,
+      max_tokens: 1024,
     }),
-    signal: AbortSignal.timeout(30_000),
+    signal: AbortSignal.timeout(60_000),
   });
 
   if (!response.ok) {
@@ -93,10 +154,76 @@ export async function askAboutPackage(
     throw new Error(`API error ${response.status} — check your endpoint and model in Settings.`);
   }
 
-  const data = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("text/event-stream")) {
+    // Server ignored `stream: true` and sent a regular completion.
+    const data = (await response.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) throw new Error("Empty response from API");
+    onDelta?.(content);
+    return content;
+  }
+
+  return readSseStream(response, onDelta);
+}
+
+/** Accumulate an OpenAI-style SSE stream (`data: {...}` frames) into the reply text. */
+async function readSseStream(
+  response: Response,
+  onDelta?: (text: string) => void,
+): Promise<string> {
+  if (!response.body) throw new Error("Empty response from API");
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let full = "";
+
+  // Returns true when the [DONE] sentinel is seen.
+  const processFrame = (line: string): boolean => {
+    const frame = line.trim();
+    if (!frame.startsWith("data:")) return false;
+    const payload = frame.slice(5).trim();
+    if (payload === "[DONE]") return true;
+    try {
+      const parsed = JSON.parse(payload) as {
+        choices?: Array<{ delta?: { content?: string } }>;
+      };
+      const delta = parsed.choices?.[0]?.delta?.content;
+      if (delta) {
+        full += delta;
+        onDelta?.(full);
+      }
+    } catch {
+      // Tolerate keep-alive comments and non-JSON frames.
+    }
+    return false;
   };
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error("Empty response from API");
-  return content;
+
+  let finished = false;
+  while (!finished) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      if (processFrame(line)) {
+        finished = true;
+        break;
+      }
+    }
+  }
+
+  // Flush a final frame that arrived without a trailing newline.
+  if (!finished) {
+    buffer += decoder.decode();
+    processFrame(buffer);
+  }
+
+  if (!full) throw new Error("Empty response from API");
+  return full;
 }

@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
 
 export interface BrewStatus {
   installed: boolean;
@@ -51,14 +51,35 @@ export function fetchFormulaDetail(name: string): Promise<PackageRecord[]> {
   return invoke<unknown>("fetch_formula_detail", { name }).then(normalizePackageList);
 }
 
+export function fetchCaskDetail(token: string): Promise<PackageRecord[]> {
+  return invoke<unknown>("fetch_cask_detail", { token }).then(normalizePackageList);
+}
+
 /** Returns a {name: installedVersion} map (~100ms, much faster than getInstalledFormulae). */
 export function getInstalledVersions(): Promise<Record<string, string>> {
   return invoke<Record<string, string>>("get_installed_versions");
 }
 
-/** Returns outdated formulae + casks (~300ms via `brew outdated --json=v1`). */
+/** Returns outdated formulae + casks (~300ms via `brew outdated --json=v2`). */
 export function getOutdatedFormulae(): Promise<OutdatedResult> {
   return invoke<OutdatedResult>("get_outdated_formulae");
+}
+
+/** Runs `brew upgrade <names…>`, invoking `onLine` for each output line. */
+export function upgradePackages(names: string[], onLine: (line: string) => void): Promise<void> {
+  const onOutput = new Channel<string>();
+  onOutput.onmessage = onLine;
+  return invoke<void>("upgrade_packages", { names, onOutput });
+}
+
+/** Returns the contents of a Brewfile generated from the current installation. */
+export function exportBrewfile(): Promise<string> {
+  return invoke<string>("export_brewfile");
+}
+
+/** Update the menu-bar tray title/tooltip with the outdated count. */
+export function updateTrayCount(outdated: number): Promise<void> {
+  return invoke<void>("update_tray_count", { outdated });
 }
 
 function normalizePackageList(data: unknown): PackageRecord[] {
@@ -76,8 +97,11 @@ function isRecord(value: unknown): value is PackageRecord {
 }
 
 export function packageName(pkg: PackageRecord): string {
-  const name = pkg.name ?? pkg.token;
-  return typeof name === "string" ? name : "unknown";
+  // Formulae: `name` is a string. Casks: `name` is an array of display names
+  // and `token` is the identifier — fall through to token there.
+  if (typeof pkg.name === "string") return pkg.name;
+  if (typeof pkg.token === "string") return pkg.token;
+  return "unknown";
 }
 
 export function packageDescription(pkg: PackageRecord): string {
@@ -102,6 +126,8 @@ export function packageVersion(pkg: PackageRecord): string | null {
     const stable = versions.stable;
     if (typeof stable === "string") return stable;
   }
+  // Casks carry a top-level `version` string instead of `versions.stable`
+  if (typeof pkg.version === "string") return pkg.version;
   const installed = pkg.installed;
   if (Array.isArray(installed) && installed.length > 0) {
     const first = installed[0];
