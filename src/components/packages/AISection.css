@@ -121,6 +121,38 @@
   border-color: var(--warning);
 }
 
+.ai-cursor {
+  color: var(--accent);
+  animation: ai-blink 1s infinite;
+}
+
+/* ── Quick prompts ────────────────────────────── */
+
+.ai-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+}
+
+.ai-chip {
+  font-size: 0.76rem;
+  padding: 0.3em 0.7em;
+  border-radius: 999px;
+  background: var(--bg-input);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  box-shadow: none;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.ai-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: transparent;
+}
+
 /* ── Input area ───────────────────────────────── */
 
 .ai-input-row {

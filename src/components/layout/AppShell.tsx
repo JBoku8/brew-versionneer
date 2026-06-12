@@ -19,6 +19,8 @@ export function AppShell({ brewStatus, brewChecking }: BrewShellProps) {
   );
   const [activeView, setActiveView] = useState<AppView>("packages");
   const [activeTab, setActiveTab] = useState<TabId>("formulae");
+  // Incremented by the sidebar "Refresh data" button; AppLayout/PackageList react to changes.
+  const [refreshToken, setRefreshToken] = useState(0);
   const { llmConfig, setLlmConfig, apiKey, setApiKey } = useAppConfig();
 
   // Once brew is confirmed installed, switch from the formulae default to the installed tab.
@@ -58,20 +60,24 @@ export function AppShell({ brewStatus, brewChecking }: BrewShellProps) {
         onViewChange={setActiveView}
         brewStatus={brewStatus}
         brewPending={brewPending}
+        onRefreshAll={() => setRefreshToken((t) => t + 1)}
       />
       <div className="shell-content">
-        {activeView === "settings" ? (
-          <SettingsView onConfigSaved={handleConfigSaved} />
-        ) : (
+        {activeView === "settings" && <SettingsView onConfigSaved={handleConfigSaved} />}
+        {/* AppLayout stays mounted while Settings is open so installed data and
+            the catalog cache survive Settings round-trips (no refetch on return). */}
+        <div className={activeView === "settings" ? "view-hidden" : "view-host"}>
           <AppLayout
             brewStatus={brewStatus}
             brewChecking={brewChecking}
             activeTab={activeTab}
+            assistantActive={activeView === "assistant"}
+            refreshToken={refreshToken}
             llmConfig={llmConfig}
             apiKey={apiKey}
             onOpenSettings={() => setActiveView("settings")}
           />
-        )}
+        </div>
       </div>
     </div>
   );

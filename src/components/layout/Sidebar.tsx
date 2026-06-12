@@ -12,6 +12,7 @@ interface SidebarProps extends Pick<BrewShellProps, "brewStatus"> {
   activeView: AppView;
   onViewChange: (view: AppView) => void;
   brewPending: boolean;
+  onRefreshAll: () => void;
 }
 
 export function Sidebar({
@@ -23,6 +24,7 @@ export function Sidebar({
   onViewChange,
   brewStatus,
   brewPending,
+  onRefreshAll,
 }: SidebarProps) {
   const brewInstalled = brewStatus?.installed ?? false;
   const brewLine = getBrewVersionLine(brewStatus);
@@ -73,8 +75,36 @@ export function Sidebar({
       {/* Divider */}
       <div className="sidebar-divider" role="separator" />
 
-      {/* Settings */}
+      {/* Actions */}
       <div className="sidebar-settings-nav">
+        <button
+          type="button"
+          className={["sidebar-item", activeView === "assistant" ? "active" : ""]
+            .filter(Boolean)
+            .join(" ")}
+          onClick={() => onViewChange("assistant")}
+          title={collapsed ? "AI Assistant" : "Ask about your whole Homebrew setup"}
+          aria-current={activeView === "assistant" ? "page" : undefined}
+        >
+          <span className="sidebar-icon" aria-hidden="true">
+            ✦
+          </span>
+          {!collapsed && <span className="sidebar-label">AI Assistant</span>}
+        </button>
+        <button
+          type="button"
+          className="sidebar-item"
+          onClick={onRefreshAll}
+          disabled={brewPending}
+          title={
+            collapsed ? "Refresh data" : "Re-download catalogs and reload installed packages"
+          }
+        >
+          <span className="sidebar-icon" aria-hidden="true">
+            ⟳
+          </span>
+          {!collapsed && <span className="sidebar-label">Refresh data</span>}
+        </button>
         <button
           type="button"
           className={["sidebar-item", activeView === "settings" ? "active" : ""]

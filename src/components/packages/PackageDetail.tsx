@@ -7,6 +7,7 @@ import {
 } from "../../api/tauri";
 import {
   formatLicense,
+  getDeprecationInfo,
   getInstalledVersionString,
   getLatestVersionString,
   isPackageOutdated,
@@ -18,11 +19,15 @@ import "./PackageDetail.css";
 interface PackageDetailProps extends LlmContextProps {
   pkg: PackageRecord | null;
   loading?: boolean;
+  onUpgrade: (names: string[]) => void;
+  upgradeRunning: boolean;
 }
 
 export function PackageDetail({
   pkg,
   loading,
+  onUpgrade,
+  upgradeRunning,
   llmConfig,
   apiKey,
   onOpenSettings,
@@ -53,16 +58,32 @@ export function PackageDetail({
   const installedVersion = getInstalledVersionString(pkg);
   const latestVersion = getLatestVersionString(pkg);
   const isOutdated = isPackageOutdated(pkg);
+  const deprecation = getDeprecationInfo(pkg);
 
   return (
     <aside className="package-detail">
       <h2>{name}</h2>
+      {deprecation && (
+        <p className="detail-deprecation">
+          ⚠ This package is {deprecation.label}
+          {deprecation.reason ? ` — ${deprecation.reason}` : ""}
+        </p>
+      )}
       {installedVersion && !isOutdated && (
         <p className="detail-version detail-installed">Installed: {installedVersion}</p>
       )}
       {isOutdated && installedVersion && latestVersion && (
         <p className="detail-version detail-outdated">
           Update available: {installedVersion} → {latestVersion}
+          <button
+            type="button"
+            className="detail-upgrade-btn"
+            onClick={() => onUpgrade([name])}
+            disabled={upgradeRunning}
+            title={`brew upgrade ${name}`}
+          >
+            {upgradeRunning ? "Upgrading…" : "Upgrade"}
+          </button>
         </p>
       )}
       {version && !installedVersion && <p className="detail-version">Version: {version}</p>}

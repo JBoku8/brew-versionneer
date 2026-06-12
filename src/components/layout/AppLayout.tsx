@@ -7,21 +7,32 @@ import {
   getOutdatedFormulae,
   packageName,
   packageVersion,
+  updateTrayCount,
+  upgradePackages,
 } from "../../api/tauri";
 import { EMPTY_OUTDATED } from "../../constants/brew";
 import { deriveBrewState } from "../../lib/brew";
+import { getErrorMessage } from "../../lib/errors";
 import { BrewShellProps, LlmContextProps } from "../../models/ui";
 import { PackageList } from "../packages";
+import { SetupAssistant } from "../packages/SetupAssistant";
+import { UpgradePanel, UpgradeState } from "../packages/UpgradePanel";
 import "./AppLayout.css";
 
 interface AppLayoutProps extends BrewShellProps, LlmContextProps {
   activeTab: TabId;
+  /** True when the sidebar "AI Assistant" view is selected. */
+  assistantActive: boolean;
+  /** Incremented by the sidebar "Refresh data" button. */
+  refreshToken: number;
 }
 
 export function AppLayout({
   brewStatus,
   brewChecking,
   activeTab,
+  assistantActive,
+  refreshToken,
   llmConfig,
   apiKey,
   onOpenSettings,
@@ -31,6 +42,7 @@ export function AppLayout({
   const [installedVersions, setInstalledVersions] = useState<Record<string, string>>({});
   const [outdatedResult, setOutdatedResult] = useState<OutdatedResult>(EMPTY_OUTDATED);
   const [installedReady, setInstalledReady] = useState(false);
+  const [upgrade, setUpgrade] = useState<UpgradeState | null>(null);
   const loadGeneration = useRef(0);
 
   const loadInstalledData = useCallback(() => {
@@ -97,21 +109,81 @@ export function AppLayout({
     loadInstalledData();
   }, [brewPending, brewChecking, loadInstalledData]);
 
+  // Sidebar "Refresh data": reload installed + outdated (token 0 = initial mount, skip).
+  const lastRefreshToken = useRef(refreshToken);
+  useEffect(() => {
+    if (refreshToken === lastRefreshToken.current) return;
+    lastRefreshToken.current = refreshToken;
+    loadInstalledData();
+  }, [refreshToken, loadInstalledData]);
+
+  // Keep the menu-bar tray badge in sync with the outdated count.
+  useEffect(() => {
+    if (!installedReady) return;
+    void updateTrayCount(outdatedResult.formulae.length).catch(() => {
+      // Tray is cosmetic — ignore failures.
+    });
+  }, [installedReady, outdatedResult]);
+
+  // Ref (not state) guards double-starts: state updaters must stay pure
+  // (StrictMode replays them), so the subprocess launch lives out here.
+  const upgradeRunningRef = useRef(false);
+  const startUpgrade = useCallback(
+    (names: string[]) => {
+      if (names.length === 0 || upgradeRunningRef.current) return;
+      upgradeRunningRef.current = true;
+      setUpgrade({ names, lines: [], running: true, error: null });
+      void (async () => {
+        try {
+          await upgradePackages(names, (line) => {
+            setUpgrade((s) => (s && s.running ? { ...s, lines: [...s.lines, line] } : s));
+          });
+          setUpgrade((s) => (s ? { ...s, running: false } : s));
+        } catch (err) {
+          const message = getErrorMessage(err);
+          setUpgrade((s) => (s ? { ...s, running: false, error: message } : s));
+        } finally {
+          upgradeRunningRef.current = false;
+          // Partial upgrades may have landed even on failure — refresh either way.
+          loadInstalledData();
+        }
+      })();
+    },
+    [loadInstalledData],
+  );
+
   return (
     <div className="app-layout">
       <main className="app-main">
-        <PackageList
-          activeTab={activeTab}
-          brewInstalled={brewInstalled}
-          installedVersions={installedVersions}
-          outdatedResult={outdatedResult}
-          installedReady={installedReady}
-          onRefreshInstalled={loadInstalledData}
-          llmConfig={llmConfig}
-          apiKey={apiKey}
-          onOpenSettings={onOpenSettings}
-        />
+        {/* Both views stay mounted so package selection and assistant chat survive switches */}
+        <div className={assistantActive ? "view-hidden" : "view-host"}>
+          <PackageList
+            activeTab={activeTab}
+            refreshToken={refreshToken}
+            brewInstalled={brewInstalled}
+            installedVersions={installedVersions}
+            outdatedResult={outdatedResult}
+            installedReady={installedReady}
+            onRefreshInstalled={loadInstalledData}
+            onUpgrade={startUpgrade}
+            upgradeRunning={upgrade?.running ?? false}
+            llmConfig={llmConfig}
+            apiKey={apiKey}
+            onOpenSettings={onOpenSettings}
+          />
+        </div>
+        <div className={assistantActive ? "view-host" : "view-hidden"}>
+          <SetupAssistant
+            installedVersions={installedVersions}
+            outdatedResult={outdatedResult}
+            installedReady={installedReady}
+            llmConfig={llmConfig}
+            apiKey={apiKey}
+            onOpenSettings={onOpenSettings}
+          />
+        </div>
       </main>
+      {upgrade && <UpgradePanel upgrade={upgrade} onClose={() => setUpgrade(null)} />}
     </div>
   );
 }

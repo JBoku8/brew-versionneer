@@ -1,0 +1,46 @@
+.assistant-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem 2rem;
+  max-width: 760px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.assistant-title {
+  margin: 0 0 0.25rem;
+  font-size: 1.25rem;
+}
+
+.assistant-sub {
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* Full-page thread — overrides the compact .ai-thread sizing from AISection */
+.assistant-thread {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+  padding-right: 0.25rem;
+}
+
+.assistant-empty {
+  align-items: center;
+  justify-content: center;
+  color: var(--text-faint);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.assistant-empty p {
+  margin: 0;
+}

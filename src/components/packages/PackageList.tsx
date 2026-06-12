@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   OutdatedResult,
   PackageRecord,
   TabId,
+  exportBrewfile,
+  fetchCaskDetail,
   fetchCasksCatalog,
   fetchFormulaDetail,
   fetchFormulaeCatalog,
@@ -18,6 +20,7 @@ import {
   buildInstalledPackageList,
   countOutdatedPackages,
   filterPackages,
+  getDeprecationInfo,
   getInstalledVersionString,
   getLatestVersionString,
   isPackageOutdated,
@@ -28,20 +31,36 @@ import "./PackageList.css";
 
 interface PackageListProps extends LlmContextProps {
   activeTab: TabId;
+  /** Incremented by the sidebar "Refresh data" button. */
+  refreshToken: number;
   brewInstalled: boolean;
   installedVersions: Record<string, string>;
   outdatedResult: OutdatedResult;
   installedReady: boolean;
   onRefreshInstalled: () => void;
+  onUpgrade: (names: string[]) => void;
+  upgradeRunning: boolean;
 }
+
+const REMOTE_TABS = ["formulae", "casks"] as const;
+
+// Module-level cache for remote catalog tabs — survives component remounts
+// (e.g. Settings round-trips), so tab switches never refetch.
+const catalogCache: Partial<Record<TabId, PackageRecord[]>> = {};
+
+// Fetched formula details, keyed by name — re-selecting a package is instant.
+const detailCache = new Map<string, PackageRecord>();
 
 export function PackageList({
   activeTab,
+  refreshToken,
   brewInstalled,
   installedVersions,
   outdatedResult,
   installedReady,
   onRefreshInstalled,
+  onUpgrade,
+  upgradeRunning,
   llmConfig,
   apiKey,
   onOpenSettings,
@@ -54,9 +73,8 @@ export function PackageList({
   const [search, setSearch] = useState("");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [showOutdatedOnly, setShowOutdatedOnly] = useState(false);
+  const [brewfileStatus, setBrewfileStatus] = useState<"idle" | "working" | "copied">("idle");
   const { panelsRef, detailWidth, isResizing, handleResizeStart } = usePanelResize();
-  // In-memory cache for remote catalog tabs — avoids re-fetching on tab switch
-  const dataCache = useRef<Partial<Record<TabId, PackageRecord[]>>>({});
 
   const loadPackages = useCallback(
     async (forceRefresh = false) => {
@@ -81,9 +99,12 @@ export function PackageList({
       }
 
       // formulae / casks — serve from in-memory cache if available
-      if (!forceRefresh && dataCache.current[activeTab]) {
-        setPackages(dataCache.current[activeTab]!);
+      const cached = catalogCache[activeTab];
+      if (!forceRefresh && cached) {
+        setPackages(cached);
         setLoading(false);
+        setError(null);
+        setVisibleCount(PAGE_SIZE);
         return;
       }
 
@@ -95,7 +116,7 @@ export function PackageList({
           activeTab === "formulae"
             ? await fetchFormulaeCatalog(forceRefresh)
             : await fetchCasksCatalog(forceRefresh);
-        dataCache.current[activeTab] = data;
+        catalogCache[activeTab] = data;
         setPackages(data);
         setVisibleCount(PAGE_SIZE);
       } catch (err) {
@@ -120,42 +141,106 @@ export function PackageList({
     void loadPackages();
   }, [loadPackages]);
 
+  // Sidebar "Refresh data": drop all cached catalogs, force-refetch the active
+  // remote tab now and the remaining ones in the background.
+  const lastRefreshToken = useRef(refreshToken);
+  useEffect(() => {
+    if (refreshToken === lastRefreshToken.current) return;
+    lastRefreshToken.current = refreshToken;
+
+    for (const tab of REMOTE_TABS) delete catalogCache[tab];
+    detailCache.clear();
+    if (activeTab !== "installed") {
+      void loadPackages(true);
+    }
+
+    const backgroundTabs = REMOTE_TABS.filter((tab) => tab !== activeTab);
+    void (async () => {
+      for (const tab of backgroundTabs) {
+        try {
+          catalogCache[tab] =
+            tab === "formulae" ? await fetchFormulaeCatalog(true) : await fetchCasksCatalog(true);
+        } catch {
+          // Next visit to the tab retries via the normal load path.
+        }
+      }
+    })();
+  }, [refreshToken, activeTab, loadPackages]);
+
   const annotated = useMemo(
     () => annotatePackages(packages, installedVersions, outdatedResult, activeTab),
     [packages, installedVersions, outdatedResult, activeTab],
   );
 
+  // Defer filtering so typing stays responsive over large catalogs.
+  const deferredSearch = useDeferredValue(search);
   const filtered = useMemo(
-    () => filterPackages(annotated, search, showOutdatedOnly),
-    [annotated, search, showOutdatedOnly],
+    () => filterPackages(annotated, deferredSearch, showOutdatedOnly),
+    [annotated, deferredSearch, showOutdatedOnly],
   );
 
   const visible = filtered.slice(0, visibleCount);
   const canLoadMore = visibleCount < filtered.length;
   const outdatedCount = useMemo(() => countOutdatedPackages(annotated), [annotated]);
+  const outdatedNames = useMemo(
+    () => outdatedResult.formulae.map((e) => e.name),
+    [outdatedResult],
+  );
+
+  const handleExportBrewfile = async () => {
+    setBrewfileStatus("working");
+    try {
+      const contents = await exportBrewfile();
+      await navigator.clipboard.writeText(contents);
+      setBrewfileStatus("copied");
+      setTimeout(() => setBrewfileStatus("idle"), 2500);
+    } catch (err) {
+      setBrewfileStatus("idle");
+      setError(getErrorMessage(err));
+    }
+  };
+
+  const selectGeneration = useRef(0);
 
   const handleSelect = async (pkg: PackageRecord) => {
     setSelected(pkg);
-    if (activeTab === "casks") return;
 
     const name = packageName(pkg);
+    const isCask = activeTab === "casks";
+    // Cask tokens can collide with formula names — namespace the cache key.
+    const cacheKey = `${isCask ? "cask" : "formula"}:${name}`;
+    const generation = ++selectGeneration.current;
+
+    const applyDetail = (detail: PackageRecord) => {
+      setSelected({
+        ...detail,
+        // Preserve install status so detail panel can show it
+        installedVersion: pkg.installedVersion,
+        isOutdated: pkg.isOutdated,
+        latestVersion: pkg.latestVersion,
+        isInstalled: pkg.isInstalled ?? activeTab === "installed",
+      });
+    };
+
+    const cached = detailCache.get(cacheKey);
+    if (cached) {
+      applyDetail(cached);
+      return;
+    }
+
     setDetailLoading(true);
     try {
-      const detail = await fetchFormulaDetail(name);
+      const detail = isCask ? await fetchCaskDetail(name) : await fetchFormulaDetail(name);
+      // A newer selection happened while this fetch was in flight — drop it.
+      if (generation !== selectGeneration.current) return;
       if (detail.length > 0) {
-        setSelected({
-          ...detail[0],
-          // Preserve install status so detail panel can show it
-          installedVersion: pkg.installedVersion,
-          isOutdated: pkg.isOutdated,
-          latestVersion: pkg.latestVersion,
-          isInstalled: pkg.isInstalled ?? activeTab === "installed",
-        });
+        detailCache.set(cacheKey, detail[0]);
+        applyDetail(detail[0]);
       }
     } catch {
       // Keep list row data on detail fetch failure
     } finally {
-      setDetailLoading(false);
+      if (generation === selectGeneration.current) setDetailLoading(false);
     }
   };
 
@@ -194,6 +279,34 @@ export function PackageList({
             }}
           >
             {showOutdatedOnly ? "Show all" : `${outdatedCount} outdated`}
+          </button>
+        )}
+
+        {activeTab === "installed" && outdatedNames.length > 0 && (
+          <button
+            type="button"
+            className="upgrade-all-btn"
+            onClick={() => onUpgrade(outdatedNames)}
+            disabled={upgradeRunning || !installedReady}
+            title={`brew upgrade ${outdatedNames.join(" ")}`}
+          >
+            {upgradeRunning ? "Upgrading…" : `Upgrade all (${outdatedNames.length})`}
+          </button>
+        )}
+
+        {activeTab === "installed" && brewInstalled && (
+          <button
+            type="button"
+            className="refresh-btn"
+            onClick={() => void handleExportBrewfile()}
+            disabled={brewfileStatus === "working"}
+            title="Generate a Brewfile from your installation and copy it to the clipboard"
+          >
+            {brewfileStatus === "copied"
+              ? "Copied ✓"
+              : brewfileStatus === "working"
+                ? "Exporting…"
+                : "Export Brewfile"}
           </button>
         )}
 
@@ -247,6 +360,7 @@ export function PackageList({
               const installedVersion = getInstalledVersionString(pkg);
               const latestVersion = getLatestVersionString(pkg);
               const isInstalled = activeTab === "installed" || pkg.isInstalled === true;
+              const deprecation = getDeprecationInfo(pkg);
               return (
                 <li key={name}>
                   <button
@@ -259,6 +373,11 @@ export function PackageList({
                     <div className="list-item-header">
                       <span className="list-item-name">{name}</span>
                       <div className="list-item-badges">
+                        {deprecation && (
+                          <span className="badge deprecated" title={deprecation.reason ?? undefined}>
+                            {deprecation.label}
+                          </span>
+                        )}
                         {isOutdated && installedVersion && (
                           <span className="badge outdated">
                             {installedVersion} → {latestVersion ?? "?"}
@@ -289,6 +408,8 @@ export function PackageList({
           <PackageDetail
             pkg={selected}
             loading={detailLoading}
+            onUpgrade={onUpgrade}
+            upgradeRunning={upgradeRunning}
             llmConfig={llmConfig}
             apiKey={apiKey}
             onOpenSettings={onOpenSettings}

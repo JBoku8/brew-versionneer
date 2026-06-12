@@ -154,6 +154,33 @@
   border: 1px solid var(--border-badge-uptodate);
 }
 
+.badge.deprecated {
+  background: transparent;
+  color: var(--warning);
+  border: 1px dashed var(--border-badge-outdated);
+}
+
+.upgrade-all-btn {
+  font-size: 0.85rem;
+  padding: 0.4em 0.8em;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: none;
+}
+
+.upgrade-all-btn:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.upgrade-all-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .filter-btn {
   font-size: 0.85rem;
   padding: 0.4em 0.8em;

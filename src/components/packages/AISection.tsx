@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChatMessage, askAboutPackage } from "../../api/llm";
 import { PackageRecord, packageName } from "../../api/tauri";
 import { getErrorMessage } from "../../lib/errors";
+import { isPackageOutdated } from "../../lib/package";
 import { LlmContextProps } from "../../models/ui";
 import "./AISection.css";
 
@@ -13,49 +14,65 @@ export function AISection({ pkg, llmConfig, apiKey, onOpenSettings }: AISectionP
   const [history, setHistory] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [streamText, setStreamText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const threadRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // Bumped when the package changes so in-flight replies for the old package are dropped.
+  const askGeneration = useRef(0);
   const pkgName = packageName(pkg);
 
   // Reset conversation when the selected package changes
   useEffect(() => {
+    askGeneration.current++;
     setHistory([]);
     setInput("");
+    setStreamText("");
     setError(null);
     setLoading(false);
   }, [pkgName]);
 
-  // Scroll to bottom after each new message
+  // Scroll to bottom as messages arrive or stream in
   useEffect(() => {
     if (threadRef.current) {
       threadRef.current.scrollTop = threadRef.current.scrollHeight;
     }
-  }, [history]);
+  }, [history, streamText]);
 
-  const handleAsk = async () => {
-    const q = input.trim();
+  const ask = async (rawQuestion: string) => {
+    const q = rawQuestion.trim();
     if (!q || !llmConfig || !apiKey || loading) return;
 
+    const generation = askGeneration.current;
     const userMsg: ChatMessage = { role: "user", content: q };
     setHistory((h) => [...h, userMsg]);
     setInput("");
     setError(null);
     setLoading(true);
+    setStreamText("");
 
     try {
-      const reply = await askAboutPackage(llmConfig, apiKey, pkg, history, q);
+      const reply = await askAboutPackage(llmConfig, apiKey, pkg, history, q, (text) => {
+        if (generation === askGeneration.current) setStreamText(text);
+      });
+      if (generation !== askGeneration.current) return;
       setHistory((h) => [...h, { role: "assistant", content: reply }]);
     } catch (err) {
+      if (generation !== askGeneration.current) return;
       setError(getErrorMessage(err));
       // Remove the user message on failure so they can retry
       setHistory((h) => h.slice(0, -1));
       setInput(q);
     } finally {
-      setLoading(false);
-      inputRef.current?.focus();
+      if (generation === askGeneration.current) {
+        setLoading(false);
+        setStreamText("");
+        inputRef.current?.focus();
+      }
     }
   };
+
+  const handleAsk = () => ask(input);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -63,6 +80,13 @@ export function AISection({ pkg, llmConfig, apiKey, onOpenSettings }: AISectionP
       void handleAsk();
     }
   };
+
+  const quickPrompts = [
+    ...(isPackageOutdated(pkg) ? ["Is it safe to upgrade?"] : []),
+    "What does this package do?",
+    "Show common usage examples",
+    "What are popular alternatives?",
+  ];
 
   // ── Not configured ────────────────────────────────
   if (!llmConfig || !apiKey) {
@@ -95,7 +119,14 @@ export function AISection({ pkg, llmConfig, apiKey, onOpenSettings }: AISectionP
           {loading && (
             <div className="ai-message ai-message-assistant">
               <span className="ai-message-label">AI</span>
-              <span className="ai-thinking">●●●</span>
+              {streamText ? (
+                <span className="ai-message-content">
+                  {streamText}
+                  <span className="ai-cursor">▍</span>
+                </span>
+              ) : (
+                <span className="ai-thinking">●●●</span>
+              )}
             </div>
           )}
           {error && (
@@ -106,6 +137,21 @@ export function AISection({ pkg, llmConfig, apiKey, onOpenSettings }: AISectionP
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {history.length === 0 && !loading && (
+        <div className="ai-chips">
+          {quickPrompts.map((prompt) => (
+            <button
+              key={prompt}
+              type="button"
+              className="ai-chip"
+              onClick={() => void ask(prompt)}
+            >
+              {prompt}
+            </button>
+          ))}
         </div>
       )}
 
