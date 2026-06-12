@@ -2,20 +2,24 @@
 
 ## What this is
 
-A **Tauri 2 + React 19 + TypeScript** macOS desktop app that lets you browse, search, and compare locally-installed vs. latest Homebrew packages. Packages are loaded fast (< 500 ms), outdated ones are highlighted, remote catalogs are cached to disk, and an AI assistant (OpenAI-compatible) can answer questions about any package.
+A **Tauri 2 + React 19 + TypeScript** macOS desktop app that lets you browse, search, compare,
+and **upgrade** locally-installed vs. latest Homebrew packages. Packages load fast (< 500 ms),
+outdated ones are highlighted, remote catalogs are cached to disk, a menu-bar tray shows the
+outdated count, and an AI assistant (OpenAI-compatible, streaming) can answer questions about
+any package or the whole setup.
 
 ---
 
 ## Tech stack
 
-| Layer         | Tech                                                                  |
-| ------------- | --------------------------------------------------------------------- |
-| Desktop shell | Tauri 2 (Rust)                                                        |
-| Frontend      | React 19 + TypeScript + Vite 7                                        |
-| Styling       | Plain CSS (no framework, no CSS variables — hardcoded hex throughout) |
-| IPC           | `@tauri-apps/api` `invoke()`                                          |
-| Remote data   | `reqwest` → `formulae.brew.sh` API                                    |
-| Keychain      | `keyring` crate (`features = ["apple-native"]`)                       |
+| Layer         | Tech                                                                       |
+| ------------- | -------------------------------------------------------------------------- |
+| Desktop shell | Tauri 2 (Rust), `tray-icon` feature enabled                                 |
+| Frontend      | React 19 + TypeScript + Vite 7                                              |
+| Styling       | Plain CSS with **theme variables** (`App.css` tokens) + ThemeContext        |
+| IPC           | `@tauri-apps/api` `invoke()` + `Channel` for streamed upgrade output        |
+| Remote data   | `reqwest` → `formulae.brew.sh` API (shared client, 30 s timeout)            |
+| Keychain      | `keyring` crate (`features = ["apple-native"]`)                             |
 
 ---
 
@@ -23,31 +27,42 @@ A **Tauri 2 + React 19 + TypeScript** macOS desktop app that lets you browse, se
 
 ```
 src-tauri/src/
-  brew.rs        — All Homebrew CLI calls (detect_brew, list --versions, outdated, info)
-  remote.rs      — Fetch + 24h disk-cache for formulae/casks catalogs from formulae.brew.sh
-  config.rs      — AppConfig struct; read/write config.json; keychain_read/write/delete via keyring
-  commands.rs    — Tauri #[tauri::command] wrappers (IPC surface)
-  lib.rs         — Registers all commands in invoke_handler![]
+  brew.rs        — Homebrew CLI calls (detect_brew, list --versions, outdated, info,
+                   upgrade_packages w/ line streaming, export_brewfile)
+  remote.rs      — Fetch + disk-cache for catalogs; CATALOG_FIELDS slim projection;
+                   shared reqwest client; stale-cache fallback; formula/cask detail fetch
+  config.rs      — AppConfig struct; read/write config.json; keychain_read/write/delete
+  commands.rs    — Tauri #[tauri::command] wrappers; brew commands are async + spawn_blocking
+  lib.rs         — Registers all commands in invoke_handler![]; tray setup (id "main")
 
 src/
-  api/tauri.ts         — TypeScript IPC wrappers + shared types + helper functions
-  api/config.ts        — Config IPC wrappers (readConfig, writeConfig, keychain helpers)
-                         + KEYCHAIN_SERVICE / KEYCHAIN_ACCOUNT constants
-  api/llm.ts           — OpenAI-compatible fetch client; askAboutPackage() builds minimal package context
-  hooks/useBrew.ts     — Returns {status, checking, error, refresh}
-                         Calls detectBrew() (fast) then getBrewVersion() (slow) in sequence
+  api/tauri.ts         — IPC wrappers + shared types + PackageRecord helper functions
+  api/config.ts        — Config IPC wrappers + KEYCHAIN_SERVICE / KEYCHAIN_ACCOUNT constants
+  api/llm.ts           — Streaming OpenAI-compatible client (chatCompletion + readSseStream);
+                         askAboutPackage (per-package), askAboutSetup (whole installation)
+  lib/                 — Pure helpers: package.ts (annotate/filter/deprecation), brew.ts,
+                         llm.ts (URL building + test connection), config.ts, errors.ts,
+                         storage.ts, theme.ts, platform.ts
+  hooks/useBrew.ts     — {status, checking, error, refresh}; detectBrew (fast) then getBrewVersion
+  hooks/useAppConfig.ts — Loads llmConfig + apiKey from config file + Keychain on mount
+  hooks/usePanelResize.ts — Drag-resize for list/detail split
+  contexts/ThemeContext.tsx — light/dark/system theme preference
+  models/ui.ts         — AppView ("packages"|"assistant"|"settings"), shared prop interfaces
+  constants/           — tabs, settings presets, layout, storage keys, brew constants
   components/
-    AppShell.tsx/.css  — Root shell: owns sidebarCollapsed (localStorage), activeView, activeTab,
-                         llmConfig, apiKey; switches tab "formulae"→"installed" once brew confirmed
-    Sidebar.tsx/.css   — Collapsible nav (200px expanded / 48px icon-only); brewPending tooltip handling
-    AppLayout.tsx/.css — Data-fetching only (installedVersions, outdatedResult); receives activeTab as prop;
-                         no header or nav rendered here
-    PackageList.tsx/.css — Package list, search, pagination, badge annotations
-    PackageDetail.tsx/.css — Right-panel detail view + AISection at bottom
-    SettingsView.tsx/.css  — LLM config (endpoint/model/key) + cache TTL; "Test connection" via fetch
-    AISection.tsx/.css     — Chat UI; 4 states: unconfigured/idle/loading/answered; resets on pkg change
-    SplashScreen.tsx/.css  — Loading splash
-    InstallBrew.tsx/.css   — Shown when Homebrew is missing
+    layout/AppShell.tsx   — Root shell: owns activeView, activeTab, refreshToken, sidebar state,
+                            llmConfig/apiKey; keeps AppLayout MOUNTED while Settings is open
+    layout/Sidebar.tsx    — Collapsible nav + AI Assistant view + "Refresh data" button
+    layout/AppLayout.tsx  — Owns installed/outdated data, upgrade state (UpgradePanel),
+                            tray-count sync; keeps PackageList AND SetupAssistant mounted
+    packages/PackageList.tsx    — List, search (useDeferredValue), pagination, badges,
+                                  Upgrade all / Export Brewfile buttons
+    packages/PackageDetail.tsx  — Detail panel + Upgrade button + deprecation warning + AISection
+    packages/AISection.tsx      — Per-package streaming chat + quick-prompt chips
+    packages/SetupAssistant.tsx — Whole-setup AI chat (installed+outdated sent as context)
+    packages/UpgradePanel.tsx   — Bottom panel with live `brew upgrade` output
+    settings/SettingsView.tsx   — Theme picker, LLM config (endpoint/model/key), cache TTL
+    brew/SplashScreen.tsx, brew/InstallBrew.tsx
 ```
 
 ---
@@ -55,24 +70,26 @@ src/
 ## IPC command registry
 
 Every Rust function in `commands.rs` must be registered in `lib.rs` `invoke_handler![]`.
+All brew subprocess commands are **async** and run via `spawn_blocking` (the `blocking()` helper)
+so they never block the main thread.
 
-| Tauri command                 | Rust fn                             | Description                                                       |
-| ----------------------------- | ----------------------------------- | ----------------------------------------------------------------- |
-| `check_brew`                  | `brew::check_brew`                  | Detect brew path + version (combined, slower)                     |
-| `detect_brew`                 | `brew::detect_brew`                 | Fast filesystem-only detection, ~1ms                              |
-| `get_brew_version`            | `brew::brew_version`                | Runs `brew --version`; called after detect                        |
-| `get_installed_versions`      | `brew::get_installed_versions_json` | `{name: version}` map, ~100ms                                     |
-| `get_outdated_formulae`       | `brew::get_outdated_json`           | `brew outdated --json=v1`, ~300ms                                 |
-| `get_installed_formulae`      | `brew::get_installed_formulae_json` | Full `brew info --json=v2 --installed` (slow fallback, ~3-10s)    |
-| `get_installed_formula_names` | `brew::get_installed_formula_names` | Plain name list                                                   |
-| `fetch_formulae_catalog`      | `remote::fetch_catalog(Formulae)`   | All formulae; 24h disk cache                                      |
-| `fetch_casks_catalog`         | `remote::fetch_catalog(Casks)`      | All casks; 24h disk cache                                         |
-| `fetch_formula_detail`        | `remote::fetch_formula_detail`      | Single formula detail (on-demand)                                 |
-| `read_config`                 | `config::read_config`               | Read Application Support config.json; returns defaults if missing |
-| `write_config`                | `config::write_config`              | Write config.json (API key excluded — use keychain)               |
-| `read_keychain`               | `config::keychain_read`             | Read secret from macOS Keychain; returns null if absent           |
-| `write_keychain`              | `config::keychain_write`            | Store secret in macOS Keychain                                    |
-| `delete_keychain`             | `config::keychain_delete`           | Remove keychain entry (NoEntry is treated as success)             |
+| Tauri command                 | Description                                                        |
+| ----------------------------- | ------------------------------------------------------------------ |
+| `check_brew` / `detect_brew`  | Brew detection (combined / fast filesystem-only ~1ms)              |
+| `get_brew_version`            | Runs `brew --version`; called after detect                         |
+| `get_installed_versions`      | `{name: version}` map, ~100ms (fast path)                          |
+| `get_outdated_formulae`       | `brew outdated --json=v2`, ~300ms                                  |
+| `get_installed_formulae`      | Full `brew info --json=v2 --installed` (slow fallback, ~3-10s)     |
+| `get_installed_formula_names` | Plain name list                                                    |
+| `upgrade_packages`            | `brew upgrade <names…>`; streams output lines via `Channel<String>`|
+| `export_brewfile`             | `brew bundle dump --file=-` → Brewfile contents                    |
+| `update_tray_count`           | Sets tray title "↑N" + tooltip from outdated count                 |
+| `fetch_formulae_catalog`      | All formulae; disk cache, TTL from config; slimmed projection      |
+| `fetch_casks_catalog`         | All casks; same caching/projection                                 |
+| `fetch_formula_detail`        | Single formula detail (full record, on-demand)                     |
+| `fetch_cask_detail`           | Single cask detail (full record, on-demand)                        |
+| `read_config` / `write_config`| config.json in Application Support (API key excluded)              |
+| `read/write/delete_keychain`  | macOS Keychain secret access                                       |
 
 ---
 
@@ -81,148 +98,134 @@ Every Rust function in `commands.rs` must be registered in `lib.rs` `invoke_hand
 ### Shell state (AppShell)
 
 ```
-AppShell owns: activeTab, activeView ("packages"|"settings"), sidebarCollapsed, llmConfig, apiKey
-- sidebarCollapsed persisted to localStorage
+AppShell owns: activeTab, activeView ("packages"|"assistant"|"settings"),
+               sidebarCollapsed (localStorage), refreshToken, llmConfig, apiKey
+- AppLayout stays MOUNTED while Settings is open (.view-host / .view-hidden wrappers)
+  → no refetch on Settings round-trips
+- refreshToken++ on sidebar "Refresh data" → AppLayout reloads installed+outdated,
+  PackageList clears module caches and force-refetches catalogs
 - Switches activeTab "formulae" → "installed" once brewInstalled && !brewPending
-- Loads llmConfig + apiKey from config file + Keychain on mount
-- Passes llmConfig + apiKey + onOpenSettings down to AppLayout → PackageList → PackageDetail
 ```
 
 ### Installed tab (fast path)
 
 ```
 AppLayout mounts
-  → loadVersions() + loadOutdated() fire in parallel (not allSettled; separate try/catch each)
+  → loadVersions() + loadOutdated() fire in parallel (separate try/catch each)
       loadVersions: getInstalledVersions() ~100ms  OR fallback: getInstalledFormulae() ~3-10s
       loadOutdated: getOutdatedFormulae() ~300ms
-  → setInstalledVersions({name: version, ...})
-  → setOutdatedResult({formulae: [...OutdatedEntry], casks: [...]})
-  → setInstalledReady(true) via loadGeneration guard
+  → installedReady=true via loadGeneration guard
+  → tray count synced from outdatedResult.formulae.length
 
-PackageList (installed tab):
-  Builds PackageRecord[] synchronously from installedVersions + outdatedResult props
-  → No IPC call; renders immediately
+PackageList (installed tab): builds rows synchronously from props — no IPC.
 ```
 
 ### Formulae / Casks tabs (cached path)
 
 ```
-Tab switch
-  → PackageList checks dataCache.current[activeTab]
-      HIT  → setPackages(cached); instant render
-      MISS → fetchFormulaeCatalog() / fetchCasksCatalog()
-               → Rust: reads disk cache if < 24h old, else HTTP fetch
-  → useMemo annotated: cross-references installedVersions + outdatedResult props
-      isInstalled, installedVersion, isOutdated, latestVersion applied without touching raw cache
+Tab switch → module-level catalogCache hit → instant render (survives remounts)
+          → miss → fetch command → Rust disk cache (TTL from Settings) or HTTP
+Rust slims each entry to CATALOG_FIELDS before caching/IPC (~90% smaller payload).
+Annotations (isInstalled/isOutdated/…) injected via useMemo from installed props.
 ```
 
-### Fallback (if fast commands unavailable)
+### Upgrade flow
 
 ```
-getInstalledVersions() rejects → fall back to getInstalledFormulae()
-  → parse PackageRecord[] → {name: version} map → same UI, just slower
+"Upgrade" (detail) or "Upgrade all (N)" (toolbar) → AppLayout.startUpgrade(names)
+  → upgradePackages IPC with Channel; lines stream into UpgradePanel (bottom log)
+  → on settle (success OR failure): loadInstalledData() refreshes installed/outdated/tray
+One upgrade at a time; buttons disabled while running.
 ```
 
 ---
 
 ## Key patterns
 
-### brewPending pattern
-
-`const brewPending = brewChecking && brewStatus === null` — true only during initial detection before
-any result arrives. Use this (not just `brewChecking`) to gate UI elements that require brew presence.
-The Installed sidebar item is disabled while `brewPending` is true.
-
-### loadGeneration ref (race condition guard)
+### Generation refs (race-condition guard)
 
 ```typescript
-const loadGeneration = useRef(0);
-const generation = ++loadGeneration.current;
-// later, before applying result:
-if (generation !== loadGeneration.current) return;
+const gen = ++generationRef.current;
+// after await:
+if (gen !== generationRef.current) return;
 ```
 
-Prevents stale async results from being applied when a newer load has started.
+Used in: AppLayout `loadGeneration` (installed loads), PackageList `selectGeneration`
+(detail fetch), AISection `askGeneration` (package switch mid-stream).
 
-### Two-phase loading
+### Module-level caches (survive remounts)
 
-- **AppLayout** owns all installed/outdated state. Fetches once on mount.
-- **PackageList** receives `installedVersions`, `outdatedResult`, `installedReady` as props.
-- Installed tab builds its list from props → no IPC, instant.
-- Remote tabs get annotations injected via `useMemo` (no cache invalidation needed).
+`catalogCache` (per-tab catalog arrays) and `detailCache` (keyed `formula:`/`cask:` + name)
+live at module scope in PackageList.tsx. Cleared by "Refresh data" / "Refresh catalog".
 
-### In-memory catalog cache
+### Keep views mounted, hide with CSS
 
-`const dataCache = useRef<Partial<Record<TabId, PackageRecord[]>>>({})` in PackageList.
-Populated on first successful remote fetch. Cleared only on "Refresh catalog" button.
+`.view-host { display: contents }` / `.view-hidden { display: none }` (AppShell.css).
+Used for AppLayout (during Settings) and PackageList/SetupAssistant switching —
+state and caches survive navigation. Never unmount these to "switch views".
 
-### Annotation via useMemo
+### Streaming LLM client
 
-Raw catalog data cached in `dataCache.current`. Annotations (isInstalled, isOutdated etc.)
-live in `useMemo(annotated)` which re-derives on every `installedVersions` prop change.
-This means: install something → hit Refresh on installed tab → annotations update across
-all tabs without re-fetching the catalog.
+`api/llm.ts` `chatCompletion()` sends `stream: true`, parses SSE via `readSseStream`,
+falls back to plain JSON if the server ignores streaming (checks content-type).
+Context goes in the **system message once**, not per turn. `onDelta` receives
+accumulated text for live rendering.
+
+### brewPending pattern
+
+`brewChecking && brewStatus === null` — true only during initial detection.
+Gates brew-dependent UI (Installed sidebar item).
+
+### Two-phase loading + annotation via useMemo
+
+AppLayout owns installed/outdated state; PackageList receives them as props.
+Raw catalogs stay cached; annotations re-derive in `useMemo` on prop change.
 
 ### height: 100% vs 100vh in nested flex
 
-Components rendered inside a `flex: 1` parent must use `height: 100%` (not `height: 100vh`) in
-their root CSS rule, otherwise they overflow the viewport. `AppLayout.css` uses `height: 100%`.
-
-### Filtering "unknown" packages
-
-`packageName(pkg)` returns `"unknown"` when a catalog entry has neither a `name` nor `token` field.
-First guard in `filtered` useMemo: `if (packageName(pkg) === "unknown") return false`.
+Components inside a `flex: 1` parent must use `height: 100%` (not `100vh`) or they overflow.
 
 ---
 
 ## PackageRecord shape
 
-`PackageRecord = Record<string, unknown>` — intentionally loose to handle both catalog
-entries (from brew API JSON) and synthetic installed entries.
+`PackageRecord = Record<string, unknown>` — intentionally loose.
+Catalog list entries are **slimmed in Rust** to `CATALOG_FIELDS` (remote.rs):
+name, token, full_name, tap, desc, description, homepage, version, versions,
+license, deprecated, deprecation_reason, disabled, disable_reason, caveats.
+Detail fetches return full records.
 
-Common fields:
-
-- `name` / `token` — package identifier
-- `desc` / `description` — one-line description
-- `versions.stable` — latest stable version (formulae)
-- `installed[0].version` — installed version from full brew info
-- `installedVersion` — injected by annotation step or synthetic installed tab entry
-- `latestVersion` — injected; equals `current_version` from outdated entry, or installedVersion
-- `isInstalled: boolean` — injected by annotation
-- `isOutdated: boolean` — injected by annotation
-
-Helper functions in `src/api/tauri.ts`:
-
-- `packageName(pkg)` — returns `name ?? token ?? "unknown"`
-- `packageDescription(pkg)` — returns `desc ?? description ?? ""`
-- `packageHomepage(pkg)` — returns `homepage` string or null
-- `packageVersion(pkg)` — prefers `versions.stable`, falls back to installed[0].version, then `installedVersion`
+Helpers in `src/api/tauri.ts`: `packageName`, `packageDescription`, `packageHomepage`,
+`packageVersion` (versions.stable → top-level version (casks) → installed[0].version →
+installedVersion). Deprecation: `getDeprecationInfo()` in `src/lib/package.ts`.
 
 ---
 
 ## Config + credential storage
 
-**Non-sensitive config** (endpoint, model, cache TTL):
-`~/Library/Application Support/com.versionneer.brew/config.json`
+**Non-sensitive config**: `~/Library/Application Support/com.versionneer.brew/config.json`
 
 ```json
 { "llm": { "endpoint": "...", "model": "..." }, "cache": { "ttl_hours": 24 } }
 ```
 
-**API key** — macOS Keychain only, never on disk:
+`ttl_hours` IS wired into the Rust catalog cache (read per fetch in commands.rs).
 
-- Service: `com.versionneer.brew` · Account: `llm-api-key`
-- Constants: `KEYCHAIN_SERVICE`, `KEYCHAIN_ACCOUNT` in `src/api/config.ts`
+**API key** — macOS Keychain only, never on disk:
+Service `com.versionneer.brew` · Account `llm-api-key`
+(constants in `src/api/config.ts`).
 
 ---
 
 ## How to add a new Tauri command
 
 1. **`src-tauri/src/brew.rs`** (or `remote.rs` / `config.rs`) — implement the Rust function
-2. **`src-tauri/src/commands.rs`** — add `#[tauri::command] pub fn my_command() -> Result<Value, String> { brew::my_fn() }`
-   - Use `AppHandle` + `app_data_dir()`/`app_cache_dir()` only if the command needs app paths
+2. **`src-tauri/src/commands.rs`** — add the `#[tauri::command]` wrapper
+   - brew subprocess work → `pub async fn` + the `blocking()` helper
+   - needs app paths → take `app: AppHandle` and use `app_data_dir`/`app_cache_dir`
+   - streamed output → add an `on_output: Channel<String>` parameter
 3. **`src-tauri/src/lib.rs`** — add `commands::my_command` to `invoke_handler![]`
-4. **`src/api/tauri.ts`** (or `config.ts`) — add `export function myCommand(): Promise<...> { return invoke("my_command"); }`
+4. **`src/api/tauri.ts`** (or `config.ts`) — add the typed `invoke()` wrapper
 5. Rebuild: `cd src-tauri && cargo build` then re-run `npm run tauri dev`
 
 ---
@@ -230,17 +233,10 @@ Helper functions in `src/api/tauri.ts`:
 ## Dev commands
 
 ```bash
-# Start full dev mode (hot reload frontend, auto-recompile Rust on change)
-npm run tauri dev
-
-# Type-check TypeScript only (fast — run after every edit)
-npx tsc --noEmit
-
-# Build Rust only (check for compile errors)
-cd src-tauri && cargo build
-
-# Production build
-npm run tauri build
+npm run tauri dev        # full dev mode (hot reload + Rust auto-recompile)
+npx tsc --noEmit         # type-check TypeScript (fast — run after every edit)
+cd src-tauri && cargo build   # Rust compile check
+npm run tauri build      # production build
 ```
 
 ---
@@ -248,19 +244,34 @@ npm run tauri build
 ## Disk cache location
 
 Catalogs: `~/Library/Caches/com.versionneer.brew/brew-catalog/{formula,cask}.json`
-TTL: 24 hours (configurable in Settings). Force-refresh via "Refresh catalog" button in the UI.
+TTL: configurable in Settings (default 24 h). Stored **slimmed**; pre-projection caches
+are slimmed on read. If a network fetch fails and any cache file exists, the stale
+cache is served instead of an error.
 
 ---
 
 ## Gotchas
 
-- **Brew path**: On Apple Silicon the brew binary lives at `/opt/homebrew/bin/brew`. Intel Macs use `/usr/local/bin/brew`. `brew.rs::resolve_brew_path()` checks all candidates.
-- **Session summaries can drift**: Always re-read key files before editing — actual code may differ from conversation summaries (e.g. `useBrew` returns `checking` not `loading`; `AppLayout` accepts `brewStatus: BrewStatus | null`).
-- **CSS class collision**: `.app-shell` existed in `App.css` for the "no brew" wrapper; renamed to `.no-brew-shell` when `AppShell` was added. Don't reuse `.app-shell`.
-- **height: 100% not 100vh**: Any component nested inside a `flex: 1` container must use `height: 100%` in its root CSS rule or it will overflow.
-- **keyring crate**: Requires `features = ["apple-native"]` in `Cargo.toml` for macOS Keychain access.
-- **Empty installed list**: Use separate `try/catch` blocks (not `Promise.all`) for loadVersions and loadOutdated so one failure doesn't block the other.
-- **Badge "undefined"**: Always guard `typeof pkg.installedVersion === "string"` before rendering a version badge.
-- **Casks don't support formula detail fetch**: `handleSelect` in PackageList early-returns for `activeTab === "casks"` before calling `fetchFormulaDetail`.
-- **Tab descriptions removed**: Nav moved to Sidebar; `AppLayout` no longer renders `<nav>` or tab description bar.
-- **No CSS variables**: All colors are hardcoded hex. New components follow the same pattern — add `@media (prefers-color-scheme: dark)` overrides in each component's CSS file.
+- **Brew path**: Apple Silicon `/opt/homebrew/bin/brew`, Intel `/usr/local/bin/brew`.
+  `brew.rs::resolve_brew_path()` checks candidates and caches successful lookups in a
+  `OnceLock` (only Some is cached so "check again" after installing brew still works).
+- **CATALOG_FIELDS projection**: if the UI starts reading a new catalog field, it MUST be
+  added to `CATALOG_FIELDS` in `remote.rs` or it will be stripped before reaching JS.
+- **Register commands**: a command missing from `lib.rs` `invoke_handler![]` fails silently
+  at runtime.
+- **Tray**: requires `tauri = { features = ["tray-icon"] }`; tray id is `"main"`, window
+  label is `"main"`. Count updates come from the frontend via `update_tray_count`.
+- **Theme variables**: colors use CSS variables defined in `App.css` (light + dark blocks)
+  driven by ThemeContext. Do NOT hardcode hex in new component CSS — use the tokens
+  (`--warning`, `--accent`, `--bg-badge-*`, `--border`, …).
+- **Session summaries can drift**: always re-read key files before editing.
+- **CSS class collision**: `.app-shell` is taken; the "no brew" wrapper uses `.no-brew-shell`.
+- **height: 100% not 100vh** inside `flex: 1` containers.
+- **keyring crate**: needs `features = ["apple-native"]` for macOS Keychain.
+- **Separate try/catch** for loadVersions / loadOutdated — one failure must not block the other.
+- **Badge "undefined"**: guard `typeof pkg.installedVersion === "string"` before rendering.
+- **Casks**: detail fetch exists (`fetch_cask_detail`); cask version is top-level `version`
+  (handled by `packageVersion`). Installed/outdated annotations cover formulae only —
+  `brew list --versions --formula` is the only installed source today.
+- **HOMEBREW env**: `run_brew` sets `HOMEBREW_NO_AUTO_UPDATE=1` / `HOMEBREW_NO_ANALYTICS=1`
+  so read-only queries never trigger slow side effects.
