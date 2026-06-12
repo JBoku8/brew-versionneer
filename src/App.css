@@ -14,42 +14,44 @@
      in the right mode instead of always using the OS default. */
   color-scheme: light dark;
 
+  /* ── Midnight Blue — light mode ──────────────────── */
+
   /* Backgrounds */
-  --bg-page:              #f6f6f6;
-  --bg-raised:            #ffffff;
-  --bg-sidebar:           #f0f2f5;
-  --bg-input:             #fafafa;
-  --bg-code:              #f4f4f4;
-  --bg-hover:             rgba(0, 0, 0, 0.06);
-  --bg-hover-list:        #f5f7ff;
-  --bg-selected:          #e8eeff;
+  --bg-page:              #F0EFFE;
+  --bg-raised:            #FFFFFF;
+  --bg-sidebar:           #FFFFFF;
+  --bg-input:             #F4F3FF;
+  --bg-code:              #EAE8FF;
+  --bg-hover:             rgba(83, 74, 183, 0.06);
+  --bg-hover-list:        rgba(83, 74, 183, 0.05);
+  --bg-selected:          rgba(83, 74, 183, 0.1);
 
   /* Borders */
-  --border:               #ddd;
-  --border-subtle:        #eee;
-  --border-faint:         #f0f0f0;
+  --border:               rgba(83, 74, 183, 0.18);
+  --border-subtle:        rgba(83, 74, 183, 0.1);
+  --border-faint:         rgba(83, 74, 183, 0.06);
 
   /* Text */
-  --text:                 #0f0f0f;
-  --text-2:               #555;
-  --text-muted:           #666;
-  --text-faint:           #888;
-  --text-dim:             #aaa;
-  --text-label:           #444;
+  --text:                 #1A1830;
+  --text-2:               #3D3A6B;
+  --text-muted:           #6B6899;
+  --text-faint:           #9490C4;
+  --text-dim:             #B8B5E8;
+  --text-label:           #3D3A6B;
 
-  /* Accent (interactive blue) */
-  --accent:               #396cd8;
-  --accent-hover:         #2f5bbf;
+  /* Accent (indigo) */
+  --accent:               #534AB7;
+  --accent-hover:         #3E368E;
 
   /* Semantic */
-  --success:              #2a7a47;
-  --warning:              #b85c00;
-  --bg-badge-outdated:    #fff0e6;
-  --bg-badge-uptodate:    #edfbf0;
-  --border-badge-outdated:#f5c49a;
-  --border-badge-uptodate:#a8e6bb;
-  --bg-error:             #fee;
-  --text-error:           #a33;
+  --success:              #0F6E56;
+  --warning:              #C96A0A;
+  --bg-badge-outdated:    rgba(201, 106, 10, 0.1);
+  --bg-badge-uptodate:    rgba(15, 110, 86, 0.1);
+  --border-badge-outdated:rgba(201, 106, 10, 0.3);
+  --border-badge-uptodate:rgba(15, 110, 86, 0.3);
+  --bg-error:             rgba(163, 45, 45, 0.08);
+  --text-error:           #A32D2D;
 
   /* Base styles */
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
@@ -65,46 +67,45 @@
   background-color: var(--bg-page);
 }
 
-/* Dark tokens — system preference (suppressed when user forces light or dark) */
+/* ── Dark tokens — system preference ───────────────── */
+
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]):not([data-theme="dark"]) {
-    --bg-page:              #1e1e1e;
-    --bg-raised:            #252830;
-    --bg-sidebar:           #1e2027;
-    --bg-input:             #1e2027;
-    --bg-code:              #1a1a1a;
-    --bg-hover:             rgba(255, 255, 255, 0.08);
-    --bg-hover-list:        #2a2d3a;
-    --bg-selected:          #2d3548;
+    --bg-page:              #12101F;
+    --bg-raised:            #1C1A30;
+    --bg-sidebar:           #1C1A30;
+    --bg-input:             #252240;
+    --bg-code:              #1E1C35;
+    --bg-hover:             rgba(127, 119, 221, 0.1);
+    --bg-hover-list:        rgba(127, 119, 221, 0.08);
+    --bg-selected:          rgba(127, 119, 221, 0.15);
 
-    --border:               #444;
-    --border-subtle:        #333;
-    --border-faint:         #333;
+    --border:               rgba(127, 119, 221, 0.2);
+    --border-subtle:        rgba(127, 119, 221, 0.12);
+    --border-faint:         rgba(127, 119, 221, 0.07);
 
-    --text:                 #f0f0f0;
-    --text-2:               #aaa;
-    --text-muted:           #888;
-    --text-faint:           #666;
-    --text-dim:             #555;
-    --text-label:           #ccc;
+    --text:                 #EAE8FF;
+    --text-2:               #B8B5E8;
+    --text-muted:           #9490C4;
+    --text-faint:           #6B6899;
+    --text-dim:             #4A4870;
+    --text-label:           #C4C0F0;
 
-    --accent:               #4a7fd4;
-    --accent-hover:         #3d6fbe;
+    --accent:               #534AB7;
+    --accent-hover:         #6A61CC;
 
-    --success:              #5fd98a;
-    --warning:              #ffb266;
-    --bg-badge-outdated:    #3d2200;
-    --bg-badge-uptodate:    #0d2e18;
-    --border-badge-outdated:#7a4400;
-    --border-badge-uptodate:#1e5c35;
-    --bg-error:             #3a2020;
-    --text-error:           #f88;
+    --success:              #1D9E75;
+    --warning:              #EF9F27;
+    --bg-badge-outdated:    rgba(239, 159, 39, 0.12);
+    --bg-badge-uptodate:    rgba(29, 158, 117, 0.12);
+    --border-badge-outdated:rgba(239, 159, 39, 0.3);
+    --border-badge-uptodate:rgba(29, 158, 117, 0.3);
+    --bg-error:             rgba(226, 75, 74, 0.12);
+    --text-error:           #E24B4A;
   }
 }
 
-/* Light tokens — forced by user ("Light" in Settings).
-   The :root defaults are already light, so we only need to override color-scheme
-   so WebKit renders native controls and the WebView background in light mode. */
+/* Light tokens — forced by user ("Light" in Settings). */
 :root[data-theme="light"] {
   color-scheme: light;
 }
@@ -112,37 +113,38 @@
 /* Dark tokens — forced by user ("Dark" in Settings) */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg-page:              #1e1e1e;
-  --bg-raised:            #252830;
-  --bg-sidebar:           #1e2027;
-  --bg-input:             #1e2027;
-  --bg-code:              #1a1a1a;
-  --bg-hover:             rgba(255, 255, 255, 0.08);
-  --bg-hover-list:        #2a2d3a;
-  --bg-selected:          #2d3548;
 
-  --border:               #444;
-  --border-subtle:        #333;
-  --border-faint:         #333;
+  --bg-page:              #12101F;
+  --bg-raised:            #1C1A30;
+  --bg-sidebar:           #1C1A30;
+  --bg-input:             #252240;
+  --bg-code:              #1E1C35;
+  --bg-hover:             rgba(127, 119, 221, 0.1);
+  --bg-hover-list:        rgba(127, 119, 221, 0.08);
+  --bg-selected:          rgba(127, 119, 221, 0.15);
 
-  --text:                 #f0f0f0;
-  --text-2:               #aaa;
-  --text-muted:           #888;
-  --text-faint:           #666;
-  --text-dim:             #555;
-  --text-label:           #ccc;
+  --border:               rgba(127, 119, 221, 0.2);
+  --border-subtle:        rgba(127, 119, 221, 0.12);
+  --border-faint:         rgba(127, 119, 221, 0.07);
 
-  --accent:               #4a7fd4;
-  --accent-hover:         #3d6fbe;
+  --text:                 #EAE8FF;
+  --text-2:               #B8B5E8;
+  --text-muted:           #9490C4;
+  --text-faint:           #6B6899;
+  --text-dim:             #4A4870;
+  --text-label:           #C4C0F0;
 
-  --success:              #5fd98a;
-  --warning:              #ffb266;
-  --bg-badge-outdated:    #3d2200;
-  --bg-badge-uptodate:    #0d2e18;
-  --border-badge-outdated:#7a4400;
-  --border-badge-uptodate:#1e5c35;
-  --bg-error:             #3a2020;
-  --text-error:           #f88;
+  --accent:               #534AB7;
+  --accent-hover:         #6A61CC;
+
+  --success:              #1D9E75;
+  --warning:              #EF9F27;
+  --bg-badge-outdated:    rgba(239, 159, 39, 0.12);
+  --bg-badge-uptodate:    rgba(29, 158, 117, 0.12);
+  --border-badge-outdated:rgba(239, 159, 39, 0.3);
+  --border-badge-uptodate:rgba(29, 158, 117, 0.3);
+  --bg-error:             rgba(226, 75, 74, 0.12);
+  --text-error:           #E24B4A;
 }
 
 /* ── Reset & layout ───────────────────────────────────────────────────────── */

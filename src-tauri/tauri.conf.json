@@ -13,6 +13,7 @@
     "windows": [
       {
         "title": "Brew Versionneer",
+        "hiddenTitle": true,
         "width": 1100,
         "height": 720,
         "minWidth": 800,

@@ -1,4 +1,5 @@
 import { TabId } from "../api/tauri";
+import { AppWindowIcon, FlaskIcon, PackageIcon } from "../components/icons/Icon";
 import { TabNavItem } from "../models/ui";
 
 export const TAB_LABELS: Record<TabId, string> = {
@@ -12,7 +13,7 @@ export function getTabLabel(tab: TabId): string {
 }
 
 export const TAB_ITEMS: TabNavItem[] = [
-  { id: "installed", label: "Installed", icon: "↓", requiresBrew: true },
-  { id: "formulae", label: "Formulae", icon: "⌘" },
-  { id: "casks", label: "Casks", icon: "⬜" },
+  { id: "installed", label: "Installed", icon: <PackageIcon />, requiresBrew: true },
+  { id: "formulae", label: "Formulae", icon: <FlaskIcon /> },
+  { id: "casks", label: "Casks", icon: <AppWindowIcon /> },
 ];

@@ -2,33 +2,84 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Brew Versionneer</title>
     <style>
-      html,
-      body {
+      html, body {
         margin: 0;
         height: 100%;
         overflow: hidden;
-        background-color: #f6f6f6;
+        font-family: Inter, system-ui, Helvetica, Arial, sans-serif;
+        background-color: #F0EFFE;
+        color: #1A1830;
+      }
+      @media (prefers-color-scheme: dark) {
+        html, body { background-color: #12101F; color: #EAE8FF; }
       }
 
-      @media (prefers-color-scheme: dark) {
-        html,
-        body {
-          background-color: #1e1e1e;
-        }
+      .splash-screen {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+      }
+      .splash-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        animation: splash-fade-in 0.4s ease-out both;
+      }
+      .splash-logo {
+        margin-bottom: 1.5rem;
+        filter: drop-shadow(0 4px 24px rgba(83, 74, 183, 0.35));
+      }
+      .splash-title {
+        margin: 0 0 0.35rem;
+        font-size: 1.4rem;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+      .splash-tagline {
+        margin: 0 0 1.25rem;
+        font-size: 0.875rem;
+        color: #6B6899;
+      }
+      .splash-message {
+        margin: 0;
+        font-size: 0.8rem;
+        color: #9490C4;
+      }
+      .compass-needle {
+        transform-origin: 36px 36px;
+        animation: needle-spin 2.5s linear infinite;
+      }
+      @keyframes needle-spin {
+        from { transform: rotate(0deg); }
+        to   { transform: rotate(360deg); }
+      }
+      @keyframes splash-fade-in {
+        from { opacity: 0; transform: translateY(10px); }
+        to   { opacity: 1; transform: translateY(0); }
       }
     </style>
-    <link rel="stylesheet" href="/src/components/SplashScreen.css" />
   </head>
 
   <body>
     <div id="root">
       <div class="splash-screen">
         <div class="splash-content">
-          <div class="splash-spinner" aria-hidden="true"></div>
+          <svg width="72" height="72" viewBox="0 0 72 72" fill="none" class="splash-logo" aria-hidden="true">
+            <rect width="72" height="72" rx="18" fill="#534AB7"/>
+            <circle cx="36" cy="36" r="25" stroke="#CECBF6" stroke-width="2"/>
+            <circle cx="36" cy="36" r="15" stroke="#7F77DD" stroke-width="1.5" stroke-dasharray="5.5 4"/>
+            <circle cx="36" cy="36" r="3.5" fill="#CECBF6"/>
+            <g class="compass-needle">
+              <line x1="36" y1="36" x2="36" y2="13" stroke="#CECBF6" stroke-width="3" stroke-linecap="round"/>
+              <line x1="36" y1="36" x2="52" y2="46" stroke="#9490C4" stroke-width="2" stroke-linecap="round"/>
+            </g>
+          </svg>
           <h1 class="splash-title">Brew Versionneer</h1>
           <p class="splash-tagline">Homebrew package browser</p>
           <p class="splash-message">Loading…</p>

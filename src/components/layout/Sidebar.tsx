@@ -1,5 +1,13 @@
 import { TabId } from "../../api/tauri";
 import { TAB_ITEMS } from "../../constants/tabs";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  CompassLogoIcon,
+  GearIcon,
+  RefreshIcon,
+  SparkleIcon,
+} from "../icons/Icon";
 import { getBrewVersionLine } from "../../lib/brew";
 import { AppView, BrewShellProps } from "../../models/ui";
 import "./Sidebar.css";
@@ -33,9 +41,7 @@ export function Sidebar({
     <aside className={collapsed ? "sidebar collapsed" : "sidebar"} aria-label="Navigation">
       {/* App logo */}
       <div className="sidebar-logo">
-        <span className="sidebar-logo-icon" aria-hidden="true">
-          ♦
-        </span>
+        <CompassLogoIcon size={20} className="sidebar-logo-icon" />
         {!collapsed && <span className="sidebar-logo-text">Brew Versionneer</span>}
       </div>
 
@@ -86,9 +92,7 @@ export function Sidebar({
           title={collapsed ? "AI Assistant" : "Ask about your whole Homebrew setup"}
           aria-current={activeView === "assistant" ? "page" : undefined}
         >
-          <span className="sidebar-icon" aria-hidden="true">
-            ✦
-          </span>
+          <span className="sidebar-icon"><SparkleIcon /></span>
           {!collapsed && <span className="sidebar-label">AI Assistant</span>}
         </button>
         <button
@@ -100,9 +104,7 @@ export function Sidebar({
             collapsed ? "Refresh data" : "Re-download catalogs and reload installed packages"
           }
         >
-          <span className="sidebar-icon" aria-hidden="true">
-            ⟳
-          </span>
+          <span className="sidebar-icon"><RefreshIcon /></span>
           {!collapsed && <span className="sidebar-label">Refresh data</span>}
         </button>
         <button
@@ -114,9 +116,7 @@ export function Sidebar({
           title={collapsed ? "Settings" : undefined}
           aria-current={activeView === "settings" ? "page" : undefined}
         >
-          <span className="sidebar-icon" aria-hidden="true">
-            ⚙
-          </span>
+          <span className="sidebar-icon"><GearIcon /></span>
           {!collapsed && <span className="sidebar-label">Settings</span>}
         </button>
       </div>
@@ -138,7 +138,7 @@ export function Sidebar({
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
-          {collapsed ? "»" : "«"}
+          {collapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
         </button>
       </div>
     </aside>
