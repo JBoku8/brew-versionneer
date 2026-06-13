@@ -8,15 +8,21 @@ import {
   packageName,
   packageVersion,
   updateTrayCount,
+  upgradeCancel,
   upgradePackages,
+  upgradeRespond,
 } from "../../api/tauri";
 import { EMPTY_OUTDATED } from "../../constants/brew";
 import { deriveBrewState } from "../../lib/brew";
 import { getErrorMessage } from "../../lib/errors";
+import {
+  detectUpgradeBlockerFromLines,
+  detectUpgradePromptFromLines,
+} from "../../lib/upgrade";
 import { BrewShellProps, LlmContextProps } from "../../models/ui";
 import { PackageList } from "../packages";
 import { SetupAssistant } from "../packages/SetupAssistant";
-import { UpgradePanel, UpgradeState } from "../packages/UpgradePanel";
+import { UpgradePanel, UpgradePhase, UpgradeState } from "../packages/UpgradePanel";
 import "./AppLayout.css";
 
 interface AppLayoutProps extends BrewShellProps, LlmContextProps {
@@ -25,6 +31,17 @@ interface AppLayoutProps extends BrewShellProps, LlmContextProps {
   assistantActive: boolean;
   /** Incremented by the sidebar "Refresh data" button. */
   refreshToken: number;
+}
+
+function appendUpgradeLine(state: UpgradeState, line: string): UpgradeState {
+  const lines = [...state.lines, line];
+  const blocker = state.blocker ?? detectUpgradeBlockerFromLines(lines);
+  const unscanned = lines.slice(state.promptDismissedAt);
+  const prompt = blocker
+    ? null
+    : state.prompt ??
+      (state.responding ? null : detectUpgradePromptFromLines(unscanned));
+  return { ...state, lines, blocker, prompt };
 }
 
 export function AppLayout({
@@ -125,32 +142,169 @@ export function AppLayout({
     });
   }, [installedReady, outdatedResult]);
 
-  // Ref (not state) guards double-starts: state updaters must stay pure
-  // (StrictMode replays them), so the subprocess launch lives out here.
   const upgradeRunningRef = useRef(false);
-  const startUpgrade = useCallback(
+  const activeUpgradeNames = useRef<string[]>([]);
+  const upgradeGeneration = useRef(0);
+  const upgradePhaseRef = useRef<UpgradePhase | null>(null);
+  const upgradeOutcomeRef = useRef<"cancelled" | "declined" | null>(null);
+
+  useEffect(() => {
+    upgradePhaseRef.current = upgrade?.phase ?? null;
+  }, [upgrade?.phase]);
+
+  const finishUpgrade = useCallback(() => {
+    upgradeRunningRef.current = false;
+    activeUpgradeNames.current = [];
+    loadInstalledData();
+  }, [loadInstalledData]);
+
+  const invalidateUpgradeRun = useCallback(() => {
+    upgradeGeneration.current += 1;
+  }, []);
+
+  const runUpgrade = useCallback(
     (names: string[]) => {
-      if (names.length === 0 || upgradeRunningRef.current) return;
-      upgradeRunningRef.current = true;
-      setUpgrade({ names, lines: [], running: true, error: null });
+      const generation = ++upgradeGeneration.current;
+      upgradeOutcomeRef.current = null;
+
+      setUpgrade((s) =>
+        s
+          ? {
+              ...s,
+              phase: "running",
+              lines: [],
+              error: null,
+              prompt: null,
+              blocker: null,
+              responding: false,
+              promptDismissedAt: 0,
+            }
+          : s,
+      );
+
       void (async () => {
         try {
           await upgradePackages(names, (line) => {
-            setUpgrade((s) => (s && s.running ? { ...s, lines: [...s.lines, line] } : s));
+            if (generation !== upgradeGeneration.current) return;
+            setUpgrade((s) => {
+              if (!s || s.phase !== "running") return s;
+              return appendUpgradeLine(s, line);
+            });
           });
-          setUpgrade((s) => (s ? { ...s, running: false } : s));
+          if (generation !== upgradeGeneration.current) return;
+          setUpgrade((s) =>
+            s ? { ...s, phase: "done", prompt: null, blocker: null, responding: false } : s,
+          );
         } catch (err) {
-          const message = getErrorMessage(err);
-          setUpgrade((s) => (s ? { ...s, running: false, error: message } : s));
+          if (generation !== upgradeGeneration.current) return;
+          const message =
+            upgradeOutcomeRef.current === "cancelled"
+              ? "Upgrade cancelled."
+              : upgradeOutcomeRef.current === "declined"
+                ? "Upgrade declined."
+                : getErrorMessage(err);
+          setUpgrade((s) =>
+            s
+              ? {
+                  ...s,
+                  phase: "done",
+                  prompt: null,
+                  blocker: null,
+                  responding: false,
+                  error: message,
+                }
+              : s,
+          );
         } finally {
-          upgradeRunningRef.current = false;
-          // Partial upgrades may have landed even on failure — refresh either way.
-          loadInstalledData();
+          if (generation === upgradeGeneration.current) {
+            upgradeOutcomeRef.current = null;
+            finishUpgrade();
+          }
         }
       })();
     },
-    [loadInstalledData],
+    [finishUpgrade],
   );
+
+  const startUpgrade = useCallback((names: string[]) => {
+    if (names.length === 0 || upgradeRunningRef.current) return;
+    upgradeRunningRef.current = true;
+    activeUpgradeNames.current = names;
+    upgradePhaseRef.current = "confirm";
+    setUpgrade({
+      names,
+      lines: [],
+      phase: "confirm",
+      error: null,
+      prompt: null,
+      blocker: null,
+      responding: false,
+      promptDismissedAt: 0,
+    });
+  }, []);
+
+  const confirmUpgrade = useCallback(() => {
+    if (upgradePhaseRef.current !== "confirm") return;
+    upgradePhaseRef.current = "running";
+    const names = activeUpgradeNames.current;
+    if (names.length === 0) return;
+    runUpgrade(names);
+  }, [runUpgrade]);
+
+  const cancelUpgrade = useCallback(() => {
+    if (upgradePhaseRef.current !== "confirm") return;
+    upgradePhaseRef.current = null;
+    upgradeRunningRef.current = false;
+    activeUpgradeNames.current = [];
+    setUpgrade(null);
+  }, []);
+
+  const abortUpgrade = useCallback(() => {
+    if (upgradePhaseRef.current !== "running") return;
+    upgradePhaseRef.current = "done";
+    upgradeOutcomeRef.current = "cancelled";
+    invalidateUpgradeRun();
+    void upgradeCancel().finally(() => {
+      finishUpgrade();
+      setUpgrade((s) =>
+        s
+          ? {
+              ...s,
+              phase: "done",
+              prompt: null,
+              blocker: null,
+              responding: false,
+              error: "Upgrade cancelled.",
+            }
+          : s,
+      );
+    });
+  }, [finishUpgrade, invalidateUpgradeRun]);
+
+  const respondToPrompt = useCallback((response: string) => {
+    if (response.startsWith("n")) {
+      upgradeOutcomeRef.current = "declined";
+    }
+    setUpgrade((s) =>
+      s
+        ? { ...s, prompt: null, responding: true, promptDismissedAt: s.lines.length }
+        : s,
+    );
+    void upgradeRespond(response)
+      .catch((err) => {
+        const message = getErrorMessage(err);
+        setUpgrade((s) => (s && s.phase === "running" ? { ...s, error: message } : s));
+      })
+      .finally(() => {
+        setUpgrade((s) => (s ? { ...s, responding: false } : s));
+      });
+  }, []);
+
+  const closeUpgradePanel = useCallback(() => {
+    setUpgrade(null);
+  }, []);
+
+  const upgradeActive = upgrade != null && upgrade.phase !== "done";
 
   return (
     <div className="app-layout">
@@ -166,7 +320,7 @@ export function AppLayout({
             installedReady={installedReady}
             onRefreshInstalled={loadInstalledData}
             onUpgrade={startUpgrade}
-            upgradeRunning={upgrade?.running ?? false}
+            upgradeRunning={upgradeActive}
             llmConfig={llmConfig}
             apiKey={apiKey}
             onOpenSettings={onOpenSettings}
@@ -183,7 +337,16 @@ export function AppLayout({
           />
         </div>
       </main>
-      {upgrade && <UpgradePanel upgrade={upgrade} onClose={() => setUpgrade(null)} />}
+      {upgrade && (
+        <UpgradePanel
+          upgrade={upgrade}
+          onClose={closeUpgradePanel}
+          onConfirm={confirmUpgrade}
+          onCancel={cancelUpgrade}
+          onAbort={abortUpgrade}
+          onRespond={respondToPrompt}
+        />
+      )}
     </div>
   );
 }

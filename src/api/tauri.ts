@@ -65,11 +65,21 @@ export function getOutdatedFormulae(): Promise<OutdatedResult> {
   return invoke<OutdatedResult>("get_outdated_formulae");
 }
 
-/** Runs `brew upgrade <names…>`, invoking `onLine` for each output line. */
+/** Runs `brew upgrade --no-ask <names…>`, invoking `onLine` for each output line. */
 export function upgradePackages(names: string[], onLine: (line: string) => void): Promise<void> {
   const onOutput = new Channel<string>();
   onOutput.onmessage = onLine;
   return invoke<void>("upgrade_packages", { names, onOutput });
+}
+
+/** Send a response to an in-progress brew upgrade prompt (e.g. `"y\n"`). */
+export function upgradeRespond(response: string): Promise<void> {
+  return invoke<void>("upgrade_respond", { response });
+}
+
+/** Abort an in-progress brew upgrade. */
+export function upgradeCancel(): Promise<void> {
+  return invoke<void>("upgrade_cancel");
 }
 
 /** Returns the contents of a Brewfile generated from the current installation. */

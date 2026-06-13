@@ -1,8 +1,15 @@
 use serde::Serialize;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::sync::OnceLock;
+use std::process::{Child, ChildStdin, Command, Stdio};
+use std::sync::{Mutex, OnceLock};
+
+struct UpgradeSession {
+    stdin: ChildStdin,
+    child: Child,
+}
+
+static UPGRADE_SESSION: Mutex<Option<UpgradeSession>> = Mutex::new(None);
 
 const BREW_CANDIDATES: &[&str] = &[
     "/opt/homebrew/bin/brew",
@@ -162,8 +169,42 @@ pub fn get_installed_versions_json() -> Result<serde_json::Value, String> {
     Ok(serde_json::Value::Object(map))
 }
 
-/// Runs `brew upgrade <names…>`, streaming each output line (stdout + stderr
-/// interleaved) through `on_line`. Blocks until the upgrade finishes.
+/// Send a line of input to an in-progress `brew upgrade` (e.g. `"y\n"`).
+pub fn upgrade_respond(response: &str) -> Result<(), String> {
+    let mut guard = UPGRADE_SESSION
+        .lock()
+        .map_err(|e| format!("Upgrade session lock failed: {e}"))?;
+    let session = guard
+        .as_mut()
+        .ok_or_else(|| "No upgrade in progress".to_string())?;
+    session
+        .stdin
+        .write_all(response.as_bytes())
+        .map_err(|e| format!("Failed to send input to brew: {e}"))?;
+    session
+        .stdin
+        .flush()
+        .map_err(|e| format!("Failed to flush brew stdin: {e}"))?;
+    Ok(())
+}
+
+/// Abort an in-progress upgrade by declining any prompt and terminating brew.
+/// Leaves the session in place so `upgrade_packages` can `wait()` and clean up.
+pub fn upgrade_cancel() -> Result<(), String> {
+    let mut guard = UPGRADE_SESSION
+        .lock()
+        .map_err(|e| format!("Upgrade session lock failed: {e}"))?;
+    if let Some(session) = guard.as_mut() {
+        let _ = session.stdin.write_all(b"n\n");
+        let _ = session.stdin.flush();
+        let _ = session.child.kill();
+    }
+    Ok(())
+}
+
+/// Runs `brew upgrade --no-ask <names…>`, streaming each output line (stdout +
+/// stderr interleaved) through `on_line`. Stdin is piped so the frontend can
+/// answer any unexpected mid-run prompts. Blocks until the upgrade finishes.
 pub fn upgrade_packages<F>(names: &[String], on_line: F) -> Result<(), String>
 where
     F: Fn(String) + Send + Clone + 'static,
@@ -175,18 +216,44 @@ where
 
     let mut child = Command::new(&brew)
         .arg("upgrade")
+        .arg("--no-ask")
         .args(names)
         .env("PATH", augmented_path())
         .env("HOMEBREW_NO_AUTO_UPDATE", "1")
         .env("HOMEBREW_NO_ANALYTICS", "1")
         .env("HOMEBREW_NO_ENV_HINTS", "1")
+        .env("HOMEBREW_NO_ASK", "1")
         .env("HOMEBREW_COLOR", "0")
+        .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("Failed to run brew upgrade: {e}"))?;
 
-    let stderr = child.stderr.take();
+    let stdin = child.stdin.take().ok_or_else(|| {
+        "Failed to open brew stdin".to_string()
+    })?;
+
+    {
+        let mut guard = UPGRADE_SESSION
+            .lock()
+            .map_err(|e| format!("Upgrade session lock failed: {e}"))?;
+        if guard.is_some() {
+            let _ = child.kill();
+            return Err("An upgrade is already in progress".to_string());
+        }
+        *guard = Some(UpgradeSession { stdin, child });
+    }
+
+    let stderr = {
+        let mut guard = UPGRADE_SESSION
+            .lock()
+            .map_err(|e| format!("Upgrade session lock failed: {e}"))?;
+        guard
+            .as_mut()
+            .and_then(|session| session.child.stderr.take())
+    };
+
     let stderr_reader = {
         let on_line = on_line.clone();
         std::thread::spawn(move || {
@@ -198,16 +265,33 @@ where
         })
     };
 
-    if let Some(stdout) = child.stdout.take() {
+    if let Some(stdout) = {
+        let mut guard = UPGRADE_SESSION
+            .lock()
+            .map_err(|e| format!("Upgrade session lock failed: {e}"))?;
+        guard
+            .as_mut()
+            .and_then(|session| session.child.stdout.take())
+    } {
         for line in BufReader::new(stdout).lines().map_while(Result::ok) {
             on_line(line);
         }
     }
     let _ = stderr_reader.join();
 
-    let status = child
-        .wait()
-        .map_err(|e| format!("Failed to wait for brew upgrade: {e}"))?;
+    let status = {
+        let mut guard = UPGRADE_SESSION
+            .lock()
+            .map_err(|e| format!("Upgrade session lock failed: {e}"))?;
+        let mut session = guard
+            .take()
+            .ok_or_else(|| "Upgrade session lost".to_string())?;
+        session
+            .child
+            .wait()
+            .map_err(|e| format!("Failed to wait for brew upgrade: {e}"))?
+    };
+
     if status.success() {
         Ok(())
     } else {

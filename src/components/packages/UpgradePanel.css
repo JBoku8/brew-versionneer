@@ -15,6 +15,27 @@
   border-bottom: 1px solid var(--border-subtle);
 }
 
+.upgrade-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.upgrade-abort {
+  font-size: 0.75rem;
+  padding: 0.15em 0.5em;
+  border-radius: 4px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--warning);
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.upgrade-abort:hover {
+  border-color: var(--warning);
+}
+
 .upgrade-title {
   display: flex;
   align-items: center;
@@ -63,6 +84,69 @@
   padding: 0.4rem 1rem;
   font-size: 0.8rem;
   color: var(--warning);
+}
+
+.upgrade-confirm,
+.upgrade-prompt,
+.upgrade-blocker {
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.upgrade-confirm-text,
+.upgrade-prompt-text,
+.upgrade-blocker-text {
+  margin: 0 0 0.55rem;
+  font-size: 0.8rem;
+  color: var(--text-2);
+}
+
+.upgrade-blocker-text code {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.upgrade-confirm-list {
+  margin: 0 0 0.65rem;
+  padding-left: 1.2rem;
+  max-height: 6rem;
+  overflow: auto;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.upgrade-actions {
+  display: flex;
+  gap: 0.45rem;
+}
+
+.upgrade-btn {
+  font-size: 0.78rem;
+  padding: 0.28em 0.75em;
+  border-radius: 4px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.upgrade-btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.upgrade-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.upgrade-btn.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: #fff;
 }
 
 .upgrade-log {

@@ -67,6 +67,18 @@ pub async fn upgrade_packages(names: Vec<String>, on_output: Channel<String>) ->
     .await?
 }
 
+/// Send input to an in-progress upgrade (e.g. `"y\n"` to confirm a prompt).
+#[tauri::command]
+pub async fn upgrade_respond(response: String) -> Result<(), String> {
+    blocking(move || brew::upgrade_respond(&response)).await?
+}
+
+/// Abort an in-progress upgrade.
+#[tauri::command]
+pub async fn upgrade_cancel() -> Result<(), String> {
+    blocking(brew::upgrade_cancel).await?
+}
+
 /// Generate a Brewfile from the current installation (`brew bundle dump --file=-`).
 #[tauri::command]
 pub async fn export_brewfile() -> Result<String, String> {

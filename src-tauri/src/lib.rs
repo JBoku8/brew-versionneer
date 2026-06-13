@@ -48,6 +48,8 @@ pub fn run() {
             commands::fetch_formula_detail,
             commands::fetch_cask_detail,
             commands::upgrade_packages,
+            commands::upgrade_respond,
+            commands::upgrade_cancel,
             commands::export_brewfile,
             commands::update_tray_count,
             commands::read_config,
