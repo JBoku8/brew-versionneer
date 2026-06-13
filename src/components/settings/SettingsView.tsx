@@ -29,15 +29,12 @@ interface SettingsViewProps {
 
 export function SettingsView({ onConfigSaved }: SettingsViewProps) {
   const { theme, setTheme } = useTheme();
-  // Form state
   const [endpoint, setEndpoint] = useState(DEFAULT_CONFIG.llm.endpoint);
   const [model, setModel] = useState(DEFAULT_CONFIG.llm.model);
   const [ttlHours, setTtlHours] = useState(DEFAULT_CONFIG.cache.ttl_hours);
   const [apiKey, setApiKey] = useState("");
   const [keyExists, setKeyExists] = useState(false);
   const [editingKey, setEditingKey] = useState(false);
-
-  // UI state
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -71,8 +68,9 @@ export function SettingsView({ onConfigSaved }: SettingsViewProps) {
       };
       await writeConfig(config);
 
-      // Handle API key changes
-      if (editingKey) {
+      // !keyExists covers first-time entry where editingKey is never set.
+      const keyNeedsSaving = editingKey || (!keyExists && apiKey.trim().length > 0);
+      if (keyNeedsSaving) {
         if (apiKey.trim()) {
           await writeKeychain(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT, apiKey.trim());
           setKeyExists(true);
@@ -84,17 +82,14 @@ export function SettingsView({ onConfigSaved }: SettingsViewProps) {
         setEditingKey(false);
       }
 
-      // null  = key unchanged (don't touch AppShell state)
-      // ""    = key explicitly deleted
-      // str   = new key value just written to Keychain
-      const finalKey = editingKey ? apiKey.trim() : null;
+      // null = unchanged; "" = deleted; string = new key
+      const finalKey = keyNeedsSaving ? apiKey.trim() : null;
       onConfigSaved?.(config, finalKey);
 
       setSaved(true);
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
       savedTimerRef.current = setTimeout(() => setSaved(false), 2500);
     } catch (err) {
-      // Surface errors inline in the future; for now log
       console.error("Settings save failed:", err);
     } finally {
       setSaving(false);
@@ -104,7 +99,6 @@ export function SettingsView({ onConfigSaved }: SettingsViewProps) {
   const handleTestConnection = async () => {
     setConnectionStatus("testing");
     setConnectionError(null);
-    // Use the key being typed; otherwise fall back to the one stored in the Keychain.
     let key = editingKey && apiKey.trim() ? apiKey.trim() : "";
     if (!key && keyExists) {
       try {

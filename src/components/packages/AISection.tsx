@@ -4,6 +4,7 @@ import { PackageRecord, packageName } from "../../api/tauri";
 import { getErrorMessage } from "../../lib/errors";
 import { isPackageOutdated } from "../../lib/package";
 import { LlmContextProps } from "../../models/ui";
+import { MarkdownContent } from "./MarkdownContent";
 import "./AISection.css";
 
 interface AISectionProps extends LlmContextProps {
@@ -113,17 +114,14 @@ export function AISection({ pkg, llmConfig, apiKey, onOpenSettings }: AISectionP
           {history.map((msg, i) => (
             <div key={i} className={`ai-message ai-message-${msg.role}`}>
               <span className="ai-message-label">{msg.role === "user" ? "You" : "AI"}</span>
-              <span className="ai-message-content">{msg.content}</span>
+              <MarkdownContent content={msg.content} />
             </div>
           ))}
           {loading && (
             <div className="ai-message ai-message-assistant">
               <span className="ai-message-label">AI</span>
               {streamText ? (
-                <span className="ai-message-content">
-                  {streamText}
-                  <span className="ai-cursor">▍</span>
-                </span>
+                <MarkdownContent content={streamText} streaming />
               ) : (
                 <span className="ai-thinking">●●●</span>
               )}

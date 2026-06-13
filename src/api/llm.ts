@@ -18,8 +18,9 @@ export interface ChatMessage {
 const SYSTEM_PROMPT =
   "You are a concise assistant that helps users understand Homebrew packages. " +
   "Answer only questions about the package provided in the context. " +
-  "Keep responses short (2–4 sentences unless detail is needed). " +
-  "Do not speculate about information not present in the package metadata.";
+  "Do not speculate about information not present in the package metadata. " +
+  "Format your response in Markdown: use ## headers to separate topics, bullet lists for multiple items, " +
+  "and `inline code` for package names and brew commands. Avoid tables.";
 
 /** Build the package context string sent with every request. */
 function buildContext(pkg: PackageRecord): string {
@@ -69,7 +70,10 @@ const SETUP_SYSTEM_PROMPT =
   "You are a Homebrew expert helping the user manage their installed packages. " +
   "Use the provided inventory to answer questions about upgrades, cleanup, redundancy, " +
   "and tool recommendations. Be concise and practical. " +
-  "If asked about a package not in the inventory, say it is not installed.";
+  "If asked about a package not in the inventory, say it is not installed. " +
+  "Format your response in Markdown: use ## headers to group by topic or category, " +
+  "bullet lists for items within each group, and `inline code` for package names and brew commands. " +
+  "Never use tables — always use bullet lists instead.";
 
 const SETUP_CONTEXT_MAX_ENTRIES = 300;
 
@@ -142,7 +146,7 @@ async function chatCompletion(
       model: config.model,
       messages,
       stream: true,
-      max_tokens: 1024,
+      max_tokens: 2048,
     }),
     signal: AbortSignal.timeout(60_000),
   });

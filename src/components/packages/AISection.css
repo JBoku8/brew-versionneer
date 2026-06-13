@@ -45,7 +45,7 @@
 /* ── Chat thread ──────────────────────────────── */
 
 .ai-thread {
-  max-height: 240px;
+  max-height: 360px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -72,13 +72,6 @@
   color: var(--accent);
 }
 
-.ai-message-content {
-  font-size: 0.85rem;
-  line-height: 1.55;
-  color: var(--text);
-  white-space: pre-wrap;
-  word-break: break-word;
-}
 
 .ai-thinking {
   font-size: 1rem;
