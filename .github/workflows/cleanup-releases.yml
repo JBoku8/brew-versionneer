@@ -1,0 +1,28 @@
+name: Cleanup old releases
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Delete previous releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh release list \
+            --repo "$REPO" \
+            --limit 100 \
+            --json tagName,isDraft,isPrerelease \
+            | jq -r '.[] | select(.isDraft == false and .isPrerelease == false) | .tagName' \
+            | tail -n +2 \
+            | while read -r tag; do
+                echo "Deleting release $tag"
+                gh release delete "$tag" --repo "$REPO" --yes
+              done
