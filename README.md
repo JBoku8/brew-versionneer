@@ -24,6 +24,34 @@ npm run tauri dev
 npm run tauri build
 ```
 
+## Releases
+
+Releases are published to [GitHub Releases](https://github.com/JBoku8/brew-versionneer/releases) as `.dmg` installers for Apple Silicon.
+
+### Cutting a release
+
+Bump the version and create a tag in one command:
+
+```bash
+npm run release:patch   # 0.1.0 → 0.1.1  (bug fixes)
+npm run release:minor   # 0.1.0 → 0.2.0  (new features)
+npm run release:major   # 0.1.0 → 1.0.0  (breaking changes)
+```
+
+This syncs the new version across `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml`, commits all three, and creates a `v*` git tag.
+
+Then push to trigger the build:
+
+```bash
+git push origin master --tags
+```
+
+GitHub Actions builds the `.dmg` on a macOS runner and opens a draft release. Review it, then click **Publish release**.
+
+### Installation note (unsigned build)
+
+The app is currently unsigned. On first launch macOS will block it — right-click the app → **Open** to proceed. Subsequent launches work normally.
+
 ## Data sources
 
 ### Local (requires Homebrew)

@@ -13,7 +13,11 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"*.{js,json,md}\" eslint.config.js prettier.config.js",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"*.{js,json}\" eslint.config.js prettier.config.js",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm run lint && npm run format:check"
+    "check": "npm run typecheck && npm run lint && npm run format:check",
+    "version": "node scripts/sync-version.mjs && git add src-tauri/tauri.conf.json src-tauri/Cargo.toml",
+    "release:patch": "npm version patch",
+    "release:minor": "npm version minor",
+    "release:major": "npm version major"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
